@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug STM32G474RETx",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/build/STM32_code.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "interface": "swd",
+            "device": "STM32G474RETx",
+            "runToEntryPoint": "main",
+            "svdFile": "${workspaceRoot}/svd/STM32G474RETx.svd",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32g4x.cfg"
+            ],
+            "preLaunchCommands": [
+                "monitor reset halt"
+            ],
+            "postLaunchCommands": [
+                "monitor reset init",
+                "monitor sleep 200"
+            ]
+        }
+    ]
+}

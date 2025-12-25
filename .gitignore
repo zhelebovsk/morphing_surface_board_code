@@ -1,0 +1,54 @@
+# build artifacts
+build/
+Debug/
+Release/
+Drivers/
+Middlewares/
+
+# CubeIDE/Eclipse files
+*.metadata
+*.launch
+*.project
+*.cproject
+*.settings/
+*.htm
+*.log
+
+# CubeMX generated
+*.ioc.save
+_*/
+
+# Auto-generated
+*.lst
+*.map
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+
+
+# --- Lattice FPGA: Keep Source, Ignore Artifacts ---
+lattice_code/*/
+!lattice_code/
+!lattice_code/*.v      # Keep Verilog source
+!lattice_code/*.lpf    # Keep Pin Assignments (Constraints)
+!lattice_code/*.ldf    # Keep Lattice Project File
+!lattice_code/*.ccl    # Keep Communication Constraint files
+!lattice_code/*.sty    # Keep Strategy files
+
+# Ignore specific Lattice noise
+lattice_code/impl1/
+lattice_code/sim/
+lattice_code/test/
+lattice_code/transcript
+lattice_code/*.dir/
+lattice_code/*.html
+lattice_code/*.xml
+lattice_code/*.log
+
+# --- Python / Data ---
+__pycache__/
+*.pyc
+*.log
+
