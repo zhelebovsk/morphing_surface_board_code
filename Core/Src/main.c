@@ -31,7 +31,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_cdc_if.h"
 #include "board_config.h"
 #include "dip.h"
 #include "timer_helper.h"
@@ -117,7 +116,6 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   uint8_t dip_id = Read_DIP_ID();
-
   char msg_usb[64] = "";
   // uint16_t pot_values[16] = {0};
   // uint16_t dir_values[16] = {0};
@@ -148,18 +146,18 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   // uint8_t usb_rx[USB_RX_BUF_SIZE] = {0};
   while (1) {
-    // usb_printf("DIP ID: %u\r\n", dip_id);
-    if (USB_GetRxFlag()) {
-      uint32_t len = USB_GetRxLength();
-      uint8_t *buf = USB_GetRxBuffer();
-      
-      snprintf(msg_usb, sizeof(msg_usb),
-          "DIP ID: %u, USB Command: %.*s\r\n",
-          dip_id, (int)len, buf);
-      CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
-      
-      USB_ClearRxFlag();
-    }
+    // if (USB_GetRxFlag()) {
+    //   uint32_t len = USB_GetRxLength();
+    //   uint8_t *buf = USB_GetRxBuffer();
+    //   snprintf(msg_usb, sizeof(msg_usb),
+    //       "DIP ID: %u, USB Command: %.*s\r\n",
+    //       dip_id, (int)len, buf);
+    //   CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
+    //   USB_ClearRxFlag();
+    // }
+    dip_id = Read_DIP_ID();
+    usb_printf("DIP ID: %u running...\r\n", dip_id);
+    HAL_Delay(1000);
     // delay_ms(100); // Main loop delay, 100 ms
     // fetch_potentiometer_values(pot_values);
     // current_time_us = get_time_us();

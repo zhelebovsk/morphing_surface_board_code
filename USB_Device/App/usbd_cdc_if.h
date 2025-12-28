@@ -56,8 +56,9 @@
 
 uint8_t* USB_GetRxBuffer(void);
 uint32_t USB_GetRxLength(void);
-uint8_t  USB_GetRxFlag(void);
-void     USB_ClearRxFlag(void);
+// uint8_t  USB_GetRxFlag(void);
+// void     USB_ClearRxFlag(void);
+
 /* USER CODE END EXPORTED_DEFINES */
 
 /**

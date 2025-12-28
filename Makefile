@@ -91,7 +91,8 @@ App/Src/dip.c \
 App/Src/timer_helper.c \
 App/Src/can_helper.c \
 App/Src/board_config.c \
-App/Src/motor_helper.c
+App/Src/motor_helper.c \
+App/Src/usb_debug.c
 
 # ASM sources
 ASM_SOURCES =  \
