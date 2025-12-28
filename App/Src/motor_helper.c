@@ -79,14 +79,15 @@ void motor_pwm_timers_start(void) {
   }
 }
 // Motor control
-void set_motor_directions(uint16_t *dir_values)
-{
-    for (int i = 0; i < 16; ++i) {
-        HAL_GPIO_WritePin(dir_ports[i], dir_pins[i], dir_values[i] ? GPIO_PIN_SET : GPIO_PIN_RESET);
-    }
+void set_motor_direction(uint8_t motor_id, uint16_t dir_value) {
+    HAL_GPIO_WritePin(dir_ports[motor_id], dir_pins[motor_id], dir_value ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
-void set_motor_power(uint16_t *pwm_values) {
-  for (int i = 0; i < 16; ++i) {
-    __HAL_TIM_SET_COMPARE(pwm_timer_handles[i], pwm_timer_channels[i], pwm_values[i]);
-  }
+void set_motor_power(uint8_t motor_id, uint16_t pwm_value) {
+    __HAL_TIM_SET_COMPARE(pwm_timer_handles[motor_id], pwm_timer_channels[motor_id], pwm_value);
+}
+void set_motor(uint8_t motor_id, int16_t motor_set) {
+      set_motor_direction(motor_id, motor_set >= 0 ? 1 : 0);
+      uint16_t pwm_value = (uint16_t)(motor_set >= 0 ? motor_set : -motor_set);
+      if (pwm_value > 255) {pwm_value = 255;}
+      set_motor_power(motor_id, pwm_value);
 }

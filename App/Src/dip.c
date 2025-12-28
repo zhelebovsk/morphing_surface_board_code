@@ -2,18 +2,12 @@
 
 uint8_t Read_DIP_ID(void)
 {
-    uint8_t dip_status[6] = {0};
-    dip_status[0] = !HAL_GPIO_ReadPin(GPIOC, DIP_1_Pin);
-    dip_status[1] = !HAL_GPIO_ReadPin(GPIOD, DIP_2_Pin);
-    dip_status[2] = !HAL_GPIO_ReadPin(GPIOD, DIP_3_Pin);
-    dip_status[3] = !HAL_GPIO_ReadPin(GPIOD, DIP_4_Pin);
-    dip_status[4] = !HAL_GPIO_ReadPin(GPIOC, DIP_5_Pin);
-    dip_status[5] = !HAL_GPIO_ReadPin(GPIOC, DIP_6_Pin);
-
-    uint8_t dip_id = (dip_status[5] << 5) | (dip_status[4] << 4) |
-                     (dip_status[3] << 3) | (dip_status[2] << 2) |
-                     (dip_status[1] << 1) |  dip_status[0];
-
-
+    uint8_t dip_id = 0;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_1_GPIO_Port, DIP_1_Pin)) << 0;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_2_GPIO_Port, DIP_2_Pin)) << 1;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_3_GPIO_Port, DIP_3_Pin)) << 2;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_4_GPIO_Port, DIP_4_Pin)) << 3;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_5_GPIO_Port, DIP_5_Pin)) << 4;
+    dip_id |= (!HAL_GPIO_ReadPin(DIP_6_GPIO_Port, DIP_6_Pin)) << 5;
     return dip_id;
 }

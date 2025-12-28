@@ -57,8 +57,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern volatile uint8_t usb_rx_buf[4];
-extern volatile uint8_t usb_rx_flag;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,85 +116,77 @@ int main(void)
   MX_TIM20_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  //user variables
-  uint8_t dip_id = 255;
-  uint16_t pot_values[16] = {0};
-  char msg[128] = "";
-  uint16_t dir_values[16] = {0};
-  uint16_t pwm_values[16] = {0};
-  int8_t k = 0;
-  int8_t new_k = 0;
-  uint32_t current_time_us = 0;
-  uint32_t current_time_s = 0;
-  // FPGA clock
-  fpga_timer_start();
-  // CAN bus
-  HAL_FDCAN_Start(&hfdcan1);
-  send_can_hello(dip_id);
-  // Board ID settings
-  dip_id = Read_DIP_ID();
-  // Potentiometer initialization and buffers 
-  Start_ADC_DMA();
-  // Communication variable
-  motor_power_setup(1);
-  motor_pwm_timers_start();
+  uint8_t dip_id = Read_DIP_ID();
 
-  // onboard time
-  HAL_TIM_Base_Start(&htim2);
-  current_time_us = get_time_us();
-  current_time_s = current_time_us / 1000000;
+  char msg_usb[64] = "";
+  // uint16_t pot_values[16] = {0};
+  // uint16_t dir_values[16] = {0};
+  // uint16_t pwm_values[16] = {0};
+  // int8_t k = 0;
+  // int8_t new_k = 0;
+  // uint32_t current_time_us = 0;
+  // uint32_t current_time_s = 0;
+  // // FPGA clock
+  // fpga_timer_start();
+  // // CAN bus
+  // HAL_FDCAN_Start(&hfdcan1);
+  // send_can_hello(dip_id);
+  // // Board ID settings
+  // // Potentiometer initialization and buffers 
+  // Start_ADC_DMA();
+  // // Communication variable
+  // motor_power_setup(1);
+  // motor_pwm_timers_start();
+
+  // // onboard time
+  // HAL_TIM_Base_Start(&htim2);
+  // current_time_us = get_time_us();
+  // current_time_s = current_time_us / 1000000;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  // uint8_t usb_rx[USB_RX_BUF_SIZE] = {0};
+  while (1) {
+    // usb_printf("DIP ID: %u\r\n", dip_id);
+    if (USB_GetRxFlag()) {
+      uint32_t len = USB_GetRxLength();
+      uint8_t *buf = USB_GetRxBuffer();
+      
+      snprintf(msg_usb, sizeof(msg_usb),
+          "DIP ID: %u, USB Command: %.*s\r\n",
+          dip_id, (int)len, buf);
+      CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
+      
+      USB_ClearRxFlag();
+    }
+    // delay_ms(100); // Main loop delay, 100 ms
+    // fetch_potentiometer_values(pot_values);
+    // current_time_us = get_time_us();
+    // current_time_s = current_time_us / 1000000;
 
-  // EEPROM test
-  // uint8_t write_val = 0xFF;
-  // uint8_t read_val = 0x00;
-  // uint16_t test_address = 0x010;
-  // EEPROM_Write(test_address, write_val);
-  // EEPROM_Read(test_address, &read_val);
-  char *msg_usart = "Hello World from STM32!\r\n";
-  uint8_t rx_buf[1];
-  FDCAN_RxHeaderTypeDef rx_header;
-  uint8_t rx_data[64] = {0}; // max payload for CAN FD
-  while (1)
-  {
-    if (HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0) > 0) 
-{
-    if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO0, &rx_header, rx_data) == HAL_OK) 
-    {
-        // Process your data here
-        // For example, echoing the first byte to USART:
-        HAL_UART_Transmit(&huart2, rx_data, 1, 10);
-    }
-}
-    // HAL_GPIO_WritePin(RS485_CONTROL_GPIO_Port, RS485_CONTROL_Pin, GPIO_PIN_SET); // Set pin high
-    HAL_UART_Receive_IT(&huart2, rx_buf, 1);
-    dip_id = Read_DIP_ID();
+    // if (usb_rx_flag) {
+    //   usb_rx_flag = 0;  // Clear flag
+    //   memset(usb_rx, 0, USB_RX_BUF_SIZE);
+    //   for (uint32_t i = 0; i < usb_rx_len && i < USB_RX_BUF_SIZE; ++i) {
+    //       usb_rx[i] = usb_rx_buf[i];
+    //   }
+      
+    //   snprintf(msg_usb, sizeof(msg_usb),
+    //       "DIP ID: %u, USB Command: %s, Length: %lu\r\n",
+    //       dip_id, usb_rx, usb_rx_len);
+    //   CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
+    // }
 
-    // HAL_UART_Transmit(&huart2, (uint8_t*)msg_usart, strlen(msg_usart), 100);
-    delay_ms(100); // Main loop delay, 100 ms
-    send_can_hello(dip_id);
-    fetch_potentiometer_values(pot_values);
-    current_time_us = get_time_us();
-    current_time_s = current_time_us / 1000000;
-    if (usb_rx_flag) {
-        usb_rx_flag = 0;  // Clear flag
-        new_k = (int8_t)atoi((char*)usb_rx_buf);
-        if (new_k >= 0 && new_k < 16) {
-            k = new_k;
-        }
-    }
-    for (int i = 0; i < 16; ++i) {
-        pwm_values[i] = 150;
-        dir_values[i] = 1;
-    }
+    // for (int i = 0; i < 16; ++i) {
+    //     pwm_values[i] = 150;
+    //     dir_values[i] = 1;
+    // }
     // pwm_values[k] = (current_time_us/2000) % 255;
     // pwm_values[k] = 0; // Example: minimum  power is 7/255, minimum starting power
     // dir_values[k] = current_time_s % 2; // Example: toggle direction every 2 seconds
-    set_motor_directions(dir_values);
-    set_motor_power(pwm_values);  
+    // set_motor_directions(dir_values);
+    // set_motor_power(pwm_values);  
     // snprintf(msg, sizeof(msg),
     //    "ID: %u, TIME: %lu us, POTs: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u\r\n",
     //    dip_id, current_time_us,
@@ -210,11 +200,9 @@ int main(void)
     //    k, pot_values[k],
     //    k, dir_values[k],
     //    k, pwm_values[k]);
-    snprintf(msg, sizeof(msg),
-    "RX: %02X\r\n",
-      rx_buf[0]
-    );
-    CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+    // set_motor(1, 200);
+    // set_motor(2, -150);
+    // set_motor(3, 1);
 
     /* USER CODE END WHILE */
 

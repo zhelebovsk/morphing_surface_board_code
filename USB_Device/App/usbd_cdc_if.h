@@ -52,7 +52,12 @@
 #define APP_RX_DATA_SIZE  2048
 #define APP_TX_DATA_SIZE  2048
 /* USER CODE BEGIN EXPORTED_DEFINES */
+#define USB_RX_BUF_SIZE 64
 
+uint8_t* USB_GetRxBuffer(void);
+uint32_t USB_GetRxLength(void);
+uint8_t  USB_GetRxFlag(void);
+void     USB_ClearRxFlag(void);
 /* USER CODE END EXPORTED_DEFINES */
 
 /**
