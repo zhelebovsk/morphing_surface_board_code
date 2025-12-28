@@ -158,10 +158,23 @@ int main(void)
   // EEPROM_Read(test_address, &read_val);
   char *msg_usart = "Hello World from STM32!\r\n";
   uint8_t rx_buf[1];
+  FDCAN_RxHeaderTypeDef rx_header;
+  uint8_t rx_data[64] = {0}; // max payload for CAN FD
   while (1)
   {
+    if (HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0) > 0) 
+{
+    if (HAL_FDCAN_GetRxMessage(&hfdcan1, FDCAN_RX_FIFO0, &rx_header, rx_data) == HAL_OK) 
+    {
+        // Process your data here
+        // For example, echoing the first byte to USART:
+        HAL_UART_Transmit(&huart2, rx_data, 1, 10);
+    }
+}
     // HAL_GPIO_WritePin(RS485_CONTROL_GPIO_Port, RS485_CONTROL_Pin, GPIO_PIN_SET); // Set pin high
     HAL_UART_Receive_IT(&huart2, rx_buf, 1);
+    dip_id = Read_DIP_ID();
+
     // HAL_UART_Transmit(&huart2, (uint8_t*)msg_usart, strlen(msg_usart), 100);
     delay_ms(100); // Main loop delay, 100 ms
     send_can_hello(dip_id);
