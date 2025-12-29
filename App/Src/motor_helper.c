@@ -1,8 +1,18 @@
 #include "motor_helper.h"
 
-uint16_t buffer_adc1[13] = {0};
-uint16_t buffer_adc2[3] = {0};
-uint8_t conv_complete[2] = {0};
+uint16_t buffer_adc1[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint16_t buffer_adc2[3] = {0, 0, 0};
+uint8_t conv_complete[2] = {0, 0};
+uint32_t pot_counter = 0;
+
+// Potentiometer ADC parameters
+const uint8_t adc_index_map[16] = {4,9,11,15,10,12,14,13,3,2,1,0,8,7,6,5};
+
+const int32_t pot_calibration_zero[16] =  {2048, 2048, 2048, 2048,
+                                           2048, 2048, 2048, 2048,
+                                           2048, 2048, 2048, 2048,
+                                           2048, 2048, 2048, 2048};
+
 
 // Power
 void motor_power_setup(uint8_t mode) {
@@ -43,18 +53,19 @@ void Start_ADC_DMA(void) {
 }
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-  if (hadc->Instance == ADC1) {
+  if (conv_complete[0] == 0 && hadc->Instance == ADC1) {
     conv_complete[0] = 1;
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t*)buffer_adc1, hadc1.Init.NbrOfConversion);
-  } else if (hadc->Instance == ADC2) {
+  } else if (conv_complete[1] == 0 && hadc->Instance == ADC2) {
     conv_complete[1] = 1;
-    HAL_ADC_Start_DMA(&hadc2, (uint32_t*)buffer_adc2, hadc2.Init.NbrOfConversion);
   }
 }
 void fetch_potentiometer_values(uint16_t *pot_values) {
     if (!(conv_complete[0] && conv_complete[1])) {
       return;
     }
+    conv_complete[0] = 0;
+    conv_complete[1] = 0;
+    pot_counter++;
     for (int i = 0; i < hadc1.Init.NbrOfConversion; i++) {
       pot_values[i] = buffer_adc1[i];
     }
@@ -69,8 +80,10 @@ void fetch_potentiometer_values(uint16_t *pot_values) {
     for (int i = 0; i < 16; ++i) {
       pot_values[i] = buffer_ordered[i];
     }
-    conv_complete[0] = 0;
-    conv_complete[1] = 0;
+}
+int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value) {
+    int32_t calibrated_value = (raw_value - pot_calibration_zero[motor_id]);
+    return calibrated_value;
 }
 // Output init settings
 void motor_pwm_timers_start(void) {

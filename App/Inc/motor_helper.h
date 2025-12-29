@@ -21,5 +21,6 @@ void motor_pwm_timers_start(void);
 // void set_motor_direction(uint8_t motor_id, uint16_t dir_value);
 // void set_motor_power(uint8_t motor_id, uint16_t pwm_value);
 void set_motor(uint8_t motor_id, int16_t motor_set);
+int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value);
 
 #endif // MOTOR_HELPER_H

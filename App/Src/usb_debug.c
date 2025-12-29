@@ -1,5 +1,6 @@
 #include "usb_debug.h"
 #include "usbd_cdc_if.h"
+#include "motor_helper.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -21,6 +22,13 @@ void usb_handle_command() {
     uint8_t *buf = USB_GetRxBuffer();
     uint32_t len = USB_GetRxLength();
     if (len == 0) {
+        return;
+    }
+    if (buf[0] == 'k') {
+        usb_printf("Kill command received\r\n");
+        for (int i = 0; i < 16; i++) {
+            set_motor(i, 0);
+        }
         return;
     }
     if (buf[0] == 'h') {

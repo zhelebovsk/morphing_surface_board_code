@@ -115,92 +115,41 @@ int main(void)
   MX_TIM20_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+  uint32_t current_time_us = 0;
   uint8_t dip_id = Read_DIP_ID();
   char msg_usb[64] = "";
-  // uint16_t pot_values[16] = {0};
+  uint16_t pot_values[16] = {0};
   // uint16_t dir_values[16] = {0};
   // uint16_t pwm_values[16] = {0};
   // int8_t k = 0;
   // int8_t new_k = 0;
-  // uint32_t current_time_us = 0;
-  // uint32_t current_time_s = 0;
   // // FPGA clock
   // fpga_timer_start();
   // // CAN bus
   // HAL_FDCAN_Start(&hfdcan1);
   // send_can_hello(dip_id);
-  // // Board ID settings
   // // Potentiometer initialization and buffers 
-  // Start_ADC_DMA();
-  // // Communication variable
-  // motor_power_setup(1);
-  // motor_pwm_timers_start();
-
-  // // onboard time
-  // HAL_TIM_Base_Start(&htim2);
-  // current_time_us = get_time_us();
-  // current_time_s = current_time_us / 1000000;
+  Start_ADC_DMA();
+  motor_power_setup(1);
+  motor_pwm_timers_start();
+  HAL_TIM_Base_Start(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  // uint8_t usb_rx[USB_RX_BUF_SIZE] = {0};
+  /* USER CODE BEGIN WHILE */  
+  set_motor(1, 50);
+  set_motor(2, -50);
+  set_motor(3, 250);
   while (1) {
-    // if (USB_GetRxFlag()) {
-    //   uint32_t len = USB_GetRxLength();
-    //   uint8_t *buf = USB_GetRxBuffer();
-    //   snprintf(msg_usb, sizeof(msg_usb),
-    //       "DIP ID: %u, USB Command: %.*s\r\n",
-    //       dip_id, (int)len, buf);
-    //   CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
-    //   USB_ClearRxFlag();
-    // }
-    dip_id = Read_DIP_ID();
-    usb_printf("DIP ID: %u running...\r\n", dip_id);
-    HAL_Delay(1000);
-    // delay_ms(100); // Main loop delay, 100 ms
-    // fetch_potentiometer_values(pot_values);
-    // current_time_us = get_time_us();
-    // current_time_s = current_time_us / 1000000;
-
-    // if (usb_rx_flag) {
-    //   usb_rx_flag = 0;  // Clear flag
-    //   memset(usb_rx, 0, USB_RX_BUF_SIZE);
-    //   for (uint32_t i = 0; i < usb_rx_len && i < USB_RX_BUF_SIZE; ++i) {
-    //       usb_rx[i] = usb_rx_buf[i];
-    //   }
-      
-    //   snprintf(msg_usb, sizeof(msg_usb),
-    //       "DIP ID: %u, USB Command: %s, Length: %lu\r\n",
-    //       dip_id, usb_rx, usb_rx_len);
-    //   CDC_Transmit_FS((uint8_t*)msg_usb, strlen(msg_usb));
-    // }
-
-    // for (int i = 0; i < 16; ++i) {
-    //     pwm_values[i] = 150;
-    //     dir_values[i] = 1;
-    // }
-    // pwm_values[k] = (current_time_us/2000) % 255;
-    // pwm_values[k] = 0; // Example: minimum  power is 7/255, minimum starting power
-    // dir_values[k] = current_time_s % 2; // Example: toggle direction every 2 seconds
-    // set_motor_directions(dir_values);
-    // set_motor_power(pwm_values);  
-    // snprintf(msg, sizeof(msg),
-    //    "ID: %u, TIME: %lu us, POTs: %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u\r\n",
-    //    dip_id, current_time_us,
-    //    pot_values[0],  pot_values[1],  pot_values[2],  pot_values[3],
-    //    pot_values[4],  pot_values[5],  pot_values[6],  pot_values[7],
-    //    pot_values[8],  pot_values[9],  pot_values[10], pot_values[11],
-    //    pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
-    // snprintf(msg, sizeof(msg),
-    //    "ID: %u, TIME: %lu us, POT[%d]: %u, DIR[%d]: %u, PWM[%d]: %u\r\n",
-    //    dip_id, current_time_us,
-    //    k, pot_values[k],
-    //    k, dir_values[k],
-    //    k, pwm_values[k]);
-    // set_motor(1, 200);
-    // set_motor(2, -150);
-    // set_motor(3, 1);
+    set_motor(3, 200);
+    delay_ms(100);
+    set_motor(3, -200);
+    current_time_us = get_time_us();
+    fetch_potentiometer_values(pot_values);
+    usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id, pot_values[0], pot_values[1], pot_values[2], pot_values[3], pot_values[4], pot_values[5], pot_values[6], pot_values[7],
+               pot_values[8], pot_values[9], pot_values[10], pot_values[11],
+               pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
+    delay_ms(100); // Main loop delay, 100 ms 
 
     /* USER CODE END WHILE */
 
