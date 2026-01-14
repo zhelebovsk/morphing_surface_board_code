@@ -104,3 +104,56 @@ void set_motor(uint8_t motor_id, int16_t motor_set) {
       if (pwm_value > 255) {pwm_value = 255;}
       set_motor_power(motor_id, pwm_value);
 }
+
+
+
+//control by position
+#define pos_res int16_t
+#define MOTOR_AMOUNT 16
+#define UP_SPEED -50
+#define DOWN_SPEED 50
+
+pos_res current_position[MOTOR_AMOUNT], desired_position[MOTOR_AMOUNT], last_desired_position[MOTOR_AMOUNT];
+int16_t motor_speeds[MOTOR_AMOUNT];
+
+
+
+void get_motor_current_positions(){
+	fetch_potentiometer_values(current_position);
+}
+
+void fix_motor_speeds(){
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		if(motor_speeds[i] == UP_SPEED && current_position[i] >= desired_position[i]){
+			motor_speeds[i] = 0;
+		}else if(motor_speeds[i] == DOWN_SPEED && current_position[i] <= desired_position[i]) {
+			motor_speeds[i] = 0;
+		}
+	}
+	debug_motor_speed_set();
+}
+
+void debug_motor_location_set(int16_t loc){
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		last_desired_position[i] = desired_position[i];
+		desired_position[i] = 1048 + (loc *200);
+		if(desired_position[i] > last_desired_position[i]){
+			motor_speeds[i] = UP_SPEED;
+		}else if(desired_position[i] < last_desired_position[i]) {
+			motor_speeds[i] = DOWN_SPEED;
+		}
+	}
+}
+
+void debug_motor_speed_set(){
+	set_motor(2, motor_speeds[2]);
+}
+
+void debug_init(){
+	get_motor_current_positions();
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		desired_position[i] = current_position[i];
+		last_desired_position[i] = current_position[i];
+		motor_speeds[i] = 0;
+	}
+}

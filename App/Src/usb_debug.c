@@ -29,6 +29,7 @@ void usb_handle_command() {
         for (int i = 0; i < 16; i++) {
             set_motor(i, 0);
         }
+        delay_ms(5000);
         return;
     }
     if (buf[0] == 'h') {
@@ -42,6 +43,11 @@ void usb_handle_command() {
     if (buf[0] == 'g') {
         usb_printf("Getter command received\r\n");
         return;
+    }
+    if (buf[0] >= '0' && buf[0] <= '9'){
+    	debug_motor_location_set(buf[0] - '0');
+    	usb_printf("Motor set location debug command received\r\n");
+    	return;
     }
     usb_printf("Received unexpected %lu bytes: %.*s\r\n", len, (int)len, buf);
     return;

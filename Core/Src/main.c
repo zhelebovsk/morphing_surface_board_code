@@ -136,20 +136,52 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */  
-  set_motor(1, 50);
-  set_motor(2, -50);
-  set_motor(3, 250);
+  /* USER CODE BEGIN WHILE */
+  //set_motor(2, 30);
+  //set_motor(2, -50);
+  //set_motor(3, 250);
+  //int16_t goal = 1500, margin = 100, current_speed = 100, high_speed = 100, low_speed = 30;
+  char counter = 0;
+  debug_init();
   while (1) {
-    set_motor(3, 200);
-    delay_ms(100);
-    set_motor(3, -200);
-    current_time_us = get_time_us();
+	//set_motor(2, current_speed);
+	//set_motor(2, 200);
+    //delay_ms(100);
+    //set_motor(2, -200);
+	counter++;
     fetch_potentiometer_values(pot_values);
-    usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id, pot_values[0], pot_values[1], pot_values[2], pot_values[3], pot_values[4], pot_values[5], pot_values[6], pot_values[7],
-               pot_values[8], pot_values[9], pot_values[10], pot_values[11],
-               pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
-    delay_ms(100); // Main loop delay, 100 ms 
+    /*if(pot_values[2] < goal - margin){
+    	if(pot_values[2] < goal - (8 * margin)){
+    		current_speed = high_speed;
+    	} else {
+    		current_speed = low_speed;
+    	}
+
+    } else if (pot_values[2] > goal + margin) {
+    	if(pot_values[2] > goal + (8 * margin)){
+    		current_speed = -high_speed;
+    	} else {
+    		current_speed = -low_speed;
+    	}
+
+    } else {
+    	current_speed = 0;
+    }*/
+
+	get_motor_current_positions();
+	fix_motor_speeds();
+
+    if(counter == 3){
+    	counter = 0;
+    	current_time_us = get_time_us();
+    	usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id,
+    			pot_values[0], pot_values[1], pot_values[2], pot_values[3],
+				pot_values[4], pot_values[5], pot_values[6], pot_values[7],
+				pot_values[8], pot_values[9], pot_values[10], pot_values[11],
+				pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
+    }
+
+    delay_ms(10); // Main loop delay, 10 ms
 
     /* USER CODE END WHILE */
 

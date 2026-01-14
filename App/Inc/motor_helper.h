@@ -23,4 +23,12 @@ void motor_pwm_timers_start(void);
 void set_motor(uint8_t motor_id, int16_t motor_set);
 int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value);
 
+
+void get_motor_current_positions();
+void fix_motor_speeds();
+void debug_motor_location_set(int16_t loc);
+void debug_motor_speed_set();
+void debug_init();
+
+
 #endif // MOTOR_HELPER_H
