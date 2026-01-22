@@ -108,11 +108,6 @@ void set_motor(uint8_t motor_id, int16_t motor_set) {
 
 
 //control by position
-#define pos_res int16_t
-#define MOTOR_AMOUNT 16
-#define UP_SPEED -50
-#define DOWN_SPEED 50
-
 pos_res current_position[MOTOR_AMOUNT], desired_position[MOTOR_AMOUNT], last_desired_position[MOTOR_AMOUNT];
 int16_t motor_speeds[MOTOR_AMOUNT];
 
@@ -130,10 +125,13 @@ void fix_motor_speeds(){
 			motor_speeds[i] = 0;
 		}
 	}
-	debug_motor_speed_set();
+	motor_speed_set();
 }
 
-void debug_motor_location_set(int16_t loc){
+void motor_location_set(void* locations){
+	// DEBUG ONLY
+	char* debug_locations_arr = (char*)locations;
+	pos_res loc = debug_locations_arr[0] - '0';
 	for(int i = 0; i < MOTOR_AMOUNT; i++){
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 1048 + (loc *200);
@@ -143,10 +141,28 @@ void debug_motor_location_set(int16_t loc){
 			motor_speeds[i] = DOWN_SPEED;
 		}
 	}
+	return;
+	//REAL CODE
+	pos_res* locations_arr = (pos_res*)locations;
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		last_desired_position[i] = desired_position[i];
+		desired_position[i] = 1536 + locations_arr[i];
+		if(desired_position[i] > last_desired_position[i]){
+			motor_speeds[i] = UP_SPEED;
+		}else if(desired_position[i] < last_desired_position[i]) {
+			motor_speeds[i] = DOWN_SPEED;
+		}
+	}
 }
 
-void debug_motor_speed_set(){
+void motor_speed_set(){
+	// DEBUG ONLY
 	set_motor(2, motor_speeds[2]);
+	return;
+	//REAL CODE
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		set_motor(i, motor_speeds[i]);
+	}
 }
 
 void debug_init(){

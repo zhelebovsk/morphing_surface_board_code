@@ -24,10 +24,15 @@ void set_motor(uint8_t motor_id, int16_t motor_set);
 int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value);
 
 
+#define pos_res uint16_t
+#define MOTOR_AMOUNT 16
+#define UP_SPEED -50
+#define DOWN_SPEED 50
+
 void get_motor_current_positions();
 void fix_motor_speeds();
-void debug_motor_location_set(int16_t loc);
-void debug_motor_speed_set();
+void motor_location_set(void* locations); //todo: change from void* to pos_res*
+void motor_speed_set();
 void debug_init();
 
 

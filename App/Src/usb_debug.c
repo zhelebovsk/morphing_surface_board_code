@@ -1,6 +1,7 @@
 #include "usb_debug.h"
 #include "usbd_cdc_if.h"
 #include "motor_helper.h"
+#include "timer_helper.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -45,7 +46,7 @@ void usb_handle_command() {
         return;
     }
     if (buf[0] >= '0' && buf[0] <= '9'){
-    	debug_motor_location_set(buf[0] - '0');
+    	motor_location_set((void*)buf);
     	usb_printf("Motor set location debug command received\r\n");
     	return;
     }

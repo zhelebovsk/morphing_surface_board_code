@@ -117,7 +117,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   uint32_t current_time_us = 0;
   uint8_t dip_id = Read_DIP_ID();
-  char msg_usb[64] = "";
+  //char msg_usb[64] = "";
   uint16_t pot_values[16] = {0};
   // uint16_t dir_values[16] = {0};
   // uint16_t pwm_values[16] = {0};
@@ -126,8 +126,8 @@ int main(void)
   // // FPGA clock
   // fpga_timer_start();
   // // CAN bus
-  // HAL_FDCAN_Start(&hfdcan1);
-  // send_can_hello(dip_id);
+  HAL_FDCAN_Start(&hfdcan1);
+  send_can_hello(dip_id);
   // // Potentiometer initialization and buffers 
   Start_ADC_DMA();
   motor_power_setup(1);
@@ -171,7 +171,7 @@ int main(void)
 	get_motor_current_positions();
 	fix_motor_speeds();
 
-    if(counter == 3){
+    if(counter == 10){
     	counter = 0;
     	current_time_us = get_time_us();
     	usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id,
@@ -179,6 +179,7 @@ int main(void)
 				pot_values[4], pot_values[5], pot_values[6], pot_values[7],
 				pot_values[8], pot_values[9], pot_values[10], pot_values[11],
 				pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
+    	send_can_hello(dip_id);
     }
 
     delay_ms(10); // Main loop delay, 10 ms
