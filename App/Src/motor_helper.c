@@ -109,8 +109,8 @@ void set_motor(uint8_t motor_id, int16_t motor_set) {
 
 //control by position
 pos_res current_position[MOTOR_AMOUNT], desired_position[MOTOR_AMOUNT], last_desired_position[MOTOR_AMOUNT];
-int16_t motor_speeds[MOTOR_AMOUNT];
-
+int16_t motor_speeds[MOTOR_AMOUNT], motor_calib_fix[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int mot = 0, scale = 64;
 
 
 void get_motor_current_positions(){
@@ -156,10 +156,6 @@ void motor_location_set(void* locations){
 }
 
 void motor_speed_set(){
-	// DEBUG ONLY
-	set_motor(2, motor_speeds[2]);
-	return;
-	//REAL CODE
 	for(int i = 0; i < MOTOR_AMOUNT; i++){
 		set_motor(i, motor_speeds[i]);
 	}
@@ -173,3 +169,59 @@ void debug_init(){
 		motor_speeds[i] = 0;
 	}
 }
+
+//zeroing
+void zero_motors(){
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		last_desired_position[i] = desired_position[i];
+		desired_position[i] = 2048 + motor_calib_fix[i];
+		if(desired_position[i] > last_desired_position[i]){
+			motor_speeds[i] = UP_SPEED;
+		}else if(desired_position[i] < last_desired_position[i]) {
+			motor_speeds[i] = DOWN_SPEED;
+		}
+	}
+}
+
+void change_motor(bool right){
+	if ((right && mot == 15) || (!right && mot == 0)){
+		return;
+	}
+	if(right){
+		mot++;
+	} else {
+		mot--;
+	}
+}
+
+void change_scale(bool up){
+	if ((up && scale == 256) || (!up && scale == 1)){
+		return;
+	}
+	if(up){
+		scale *= 2;
+	} else {
+		scale /= 2;
+	}
+}
+
+void change_zero(bool pos){
+	//motor_calib_fix
+	if (pos && ((motor_calib_fix[mot] + scale) > 512)){
+		motor_calib_fix[mot] = 512;
+		return;
+	}
+	if (!pos && ((motor_calib_fix[mot] - scale) < -512)){
+		motor_calib_fix[mot] = -512;
+		return;
+	}
+	if(pos){
+		motor_calib_fix[mot] += scale;
+	} else {
+		motor_calib_fix[mot] -= scale;
+	}
+}
+
+int getmot(){return mot;}
+int get_zero_val(int id){return motor_calib_fix[id];}
+int getscale(){return scale;}

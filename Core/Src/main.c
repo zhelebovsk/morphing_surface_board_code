@@ -36,6 +36,7 @@
 #include "timer_helper.h"
 #include "can_helper.h"
 #include "motor_helper.h"
+#include "usb_debug.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -143,6 +144,7 @@ int main(void)
   //int16_t goal = 1500, margin = 100, current_speed = 100, high_speed = 100, low_speed = 30;
   char counter = 0;
   debug_init();
+  zero_motors(); // TODO: DELETE! THIS IS FOR ZEROING ONLY
   while (1) {
 	//set_motor(2, current_speed);
 	//set_motor(2, 200);
@@ -171,7 +173,7 @@ int main(void)
 	get_motor_current_positions();
 	fix_motor_speeds();
 
-    if(counter == 10){
+    if(counter == 100){
     	counter = 0;
     	current_time_us = get_time_us();
     	usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id,

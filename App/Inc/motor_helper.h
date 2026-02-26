@@ -4,6 +4,7 @@
 #include "stm32g4xx_hal.h"
 #include "adc.h"
 #include "board_config.h"
+#include <stdbool.h>
 // #include "main.h"
 // void set_motor_directions(uint16_t *dir_values);
 // void set_motor_power(uint16_t *pwm_values);
@@ -26,8 +27,8 @@ int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value);
 
 #define pos_res uint16_t
 #define MOTOR_AMOUNT 16
-#define UP_SPEED -50
-#define DOWN_SPEED 50
+#define UP_SPEED 50
+#define DOWN_SPEED -50
 
 void get_motor_current_positions();
 void fix_motor_speeds();
@@ -35,5 +36,12 @@ void motor_location_set(void* locations); //todo: change from void* to pos_res*
 void motor_speed_set();
 void debug_init();
 
+void zero_motors();
+void change_motor(bool right);
+void change_scale(bool up);
+void change_zero(bool pos);
+int getmot();
+int get_zero_val(int id);
+int getscale();
 
 #endif // MOTOR_HELPER_H
