@@ -1,20 +1,11 @@
 #include "motor_helper.h"
 
+volatile uint8_t conv_complete[2] = {0, 0};
 uint16_t buffer_adc1[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint16_t buffer_adc2[3] = {0, 0, 0};
-uint8_t conv_complete[2] = {0, 0};
-uint32_t pot_counter = 0;
-
-// Potentiometer ADC parameters
 const uint8_t adc_index_map[16] = {4,9,11,15,10,12,14,13,3,2,1,0,8,7,6,5};
 
-const int32_t pot_calibration_zero[16] =  {2048, 2048, 2048, 2048,
-                                           2048, 2048, 2048, 2048,
-                                           2048, 2048, 2048, 2048,
-                                           2048, 2048, 2048, 2048};
-
-
-// Power
+// Motor power supply voltage options
 void motor_power_setup(uint8_t mode) {
   // Enable 6V power supply for motors
   //  voltage | 6.06 | 6.27 | 6.37 | 6.57
@@ -40,7 +31,15 @@ void motor_power_setup(uint8_t mode) {
     return;
   }
 }
-// ADC 
+
+// PWM timer start
+void motor_pwm_timers_start(void) {
+  for (int i = 0; i < 16; ++i) {
+    HAL_TIM_PWM_Start(pwm_timer_handles[i], pwm_timer_channels[i]);
+  }
+}
+
+// ADC Start
 void Start_ADC_DMA(void) {
   if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK) {
     Error_Handler();
@@ -51,21 +50,23 @@ void Start_ADC_DMA(void) {
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)buffer_adc1, hadc1.Init.NbrOfConversion);
   HAL_ADC_Start_DMA(&hadc2, (uint32_t*)buffer_adc2, hadc2.Init.NbrOfConversion);
 }
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
+
+// ADC Conversion complete callback
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   if (conv_complete[0] == 0 && hadc->Instance == ADC1) {
     conv_complete[0] = 1;
   } else if (conv_complete[1] == 0 && hadc->Instance == ADC2) {
     conv_complete[1] = 1;
   }
 }
+
+// Position poll, all motors
 void fetch_potentiometer_values(uint16_t *pot_values) {
     if (!(conv_complete[0] && conv_complete[1])) {
       return;
     }
     conv_complete[0] = 0;
     conv_complete[1] = 0;
-    pot_counter++;
     for (int i = 0; i < hadc1.Init.NbrOfConversion; i++) {
       pot_values[i] = buffer_adc1[i];
     }
@@ -81,37 +82,40 @@ void fetch_potentiometer_values(uint16_t *pot_values) {
       pot_values[i] = buffer_ordered[i];
     }
 }
-int32_t get_calibrated_potentiometer_value(uint8_t motor_id, int32_t raw_value) {
-    int32_t calibrated_value = (raw_value - pot_calibration_zero[motor_id]);
-    return calibrated_value;
-}
-// Output init settings
-void motor_pwm_timers_start(void) {
-  for (int i = 0; i < 16; ++i) {
-    HAL_TIM_PWM_Start(pwm_timer_handles[i], pwm_timer_channels[i]);
-  }
-}
-// Motor control
+
+// Motor direct control
 void set_motor_direction(uint8_t motor_id, uint16_t dir_value) {
-    HAL_GPIO_WritePin(dir_ports[motor_id], dir_pins[motor_id], dir_value ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(dir_ports[motor_id], dir_pins[motor_id], dir_value ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 void set_motor_power(uint8_t motor_id, uint16_t pwm_value) {
-    __HAL_TIM_SET_COMPARE(pwm_timer_handles[motor_id], pwm_timer_channels[motor_id], pwm_value);
+	__HAL_TIM_SET_COMPARE(pwm_timer_handles[motor_id], pwm_timer_channels[motor_id], pwm_value);
 }
 void set_motor(uint8_t motor_id, int16_t motor_set) {
-      set_motor_direction(motor_id, motor_set >= 0 ? 1 : 0);
-      uint16_t pwm_value = (uint16_t)(motor_set >= 0 ? motor_set : -motor_set);
-      if (pwm_value > 255) {pwm_value = 255;}
-      set_motor_power(motor_id, pwm_value);
+	set_motor_direction(motor_id, motor_set >= 0 ? 1 : 0);
+	uint16_t pwm_value = (uint16_t)(motor_set >= 0 ? motor_set : -motor_set);
+	if (pwm_value > 255) {pwm_value = 255;}
+	set_motor_power(motor_id, pwm_value);
 }
 
+// Control by position
 
+uint16_t current_position[MOTOR_AMOUNT];
+uint16_t desired_position[MOTOR_AMOUNT]; 
+uint16_t last_desired_position[MOTOR_AMOUNT];
 
-//control by position
-pos_res current_position[MOTOR_AMOUNT], desired_position[MOTOR_AMOUNT], last_desired_position[MOTOR_AMOUNT];
-int16_t motor_speeds[MOTOR_AMOUNT], motor_calib_fix[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int16_t motor_speeds[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int16_t motor_calib_fix[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 int mot = 0, scale = 64;
 
+void position_init(){
+	get_motor_current_positions();
+	for(int i = 0; i < MOTOR_AMOUNT; i++){
+		desired_position[i] = current_position[i];
+		last_desired_position[i] = current_position[i];
+		motor_speeds[i] = 0;
+	}
+}
 
 void get_motor_current_positions(){
 	fetch_potentiometer_values(current_position);
@@ -128,22 +132,8 @@ void fix_motor_speeds(){
 	motor_speed_set();
 }
 
-void motor_location_set(void* locations){
-	// DEBUG ONLY
-	char* debug_locations_arr = (char*)locations;
-	pos_res loc = debug_locations_arr[0] - '0';
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		last_desired_position[i] = desired_position[i];
-		desired_position[i] = 1048 + (loc *200);
-		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
-		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
-		}
-	}
-	return;
-	//REAL CODE
-	pos_res* locations_arr = (pos_res*)locations;
+void motors_location_set(uint16_t* locations) {
+	uint16_t* locations_arr = (uint16_t*)locations;
 	for(int i = 0; i < MOTOR_AMOUNT; i++){
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 1536 + locations_arr[i];
@@ -155,33 +145,22 @@ void motor_location_set(void* locations){
 	}
 }
 
-void motor_speed_set(){
+void motor_location_set(uint8_t motor_id, uint16_t location) {
+	last_desired_position[motor_id] = desired_position[motor_id];
+	desired_position[motor_id] = 1536 + location;
+	if(desired_position[motor_id] > last_desired_position[motor_id]){
+		motor_speeds[motor_id] = UP_SPEED;
+	}else if(desired_position[motor_id] < last_desired_position[motor_id]) {
+		motor_speeds[motor_id] = DOWN_SPEED;
+	}
+}
+
+void motor_speed_set() {
 	for(int i = 0; i < MOTOR_AMOUNT; i++){
 		set_motor(i, motor_speeds[i]);
 	}
 }
 
-void debug_init(){
-	get_motor_current_positions();
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		desired_position[i] = current_position[i];
-		last_desired_position[i] = current_position[i];
-		motor_speeds[i] = 0;
-	}
-}
-
-//zeroing
-void zero_motors(){
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		last_desired_position[i] = desired_position[i];
-		desired_position[i] = 2048 + motor_calib_fix[i];
-		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
-		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
-		}
-	}
-}
 
 void change_motor(bool right){
 	if ((right && mot == 15) || (!right && mot == 0)){

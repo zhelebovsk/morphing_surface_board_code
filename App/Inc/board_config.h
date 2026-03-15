@@ -14,4 +14,10 @@ extern const uint16_t       dir_pins[16];
 extern TIM_HandleTypeDef * const pwm_timer_handles[16];
 extern const uint32_t       pwm_timer_channels[16];
 
+// DIP switch state 
+extern uint16_t board_id;
+extern uint32_t current_time_us;
+extern const uint8_t active_motors[14];
+
+
 #endif

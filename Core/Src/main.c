@@ -116,79 +116,37 @@ int main(void)
   MX_TIM20_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  uint32_t current_time_us = 0;
-  uint8_t dip_id = Read_DIP_ID();
-  //char msg_usb[64] = "";
-  uint16_t pot_values[16] = {0};
-  // uint16_t dir_values[16] = {0};
-  // uint16_t pwm_values[16] = {0};
-  // int8_t k = 0;
-  // int8_t new_k = 0;
-  // // FPGA clock
-  // fpga_timer_start();
-  // // CAN bus
   HAL_FDCAN_Start(&hfdcan1);
-  send_can_hello(dip_id);
-  // // Potentiometer initialization and buffers 
+  HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, ENABLE);
   Start_ADC_DMA();
+  HAL_TIM_Base_Start(&htim2);
   motor_power_setup(1);
   motor_pwm_timers_start();
-  HAL_TIM_Base_Start(&htim2);
+
+  current_time_us = get_time_us(); // Initialize global time variable
+  board_id = Read_Board_ID(); // Initialize global board ID variable
+  
+  // uint16_t pot_values[16] = {0};
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  //set_motor(2, 30);
-  //set_motor(2, -50);
-  //set_motor(3, 250);
-  //int16_t goal = 1500, margin = 100, current_speed = 100, high_speed = 100, low_speed = 30;
-  char counter = 0;
-  debug_init();
-  zero_motors(); // TODO: DELETE! THIS IS FOR ZEROING ONLY
+  position_init();
+  // zero_motors(); // TODO: DELETE! THIS IS FOR ZEROING ONLY
   while (1) {
-	//set_motor(2, current_speed);
-	//set_motor(2, 200);
-    //delay_ms(100);
-    //set_motor(2, -200);
-	counter++;
-    fetch_potentiometer_values(pot_values);
-    /*if(pot_values[2] < goal - margin){
-    	if(pot_values[2] < goal - (8 * margin)){
-    		current_speed = high_speed;
-    	} else {
-    		current_speed = low_speed;
-    	}
+    // usb_printf("t: %lu DIP ID: %u running... 
+    // CAN_Send(board_id, &counter2, FDCAN_DLC_BYTES_1);
+    // CAN_Send_ID(board_id);
+    // CAN_Send_Pot(board_id, pot_values);
+    // fetch_potentiometer_values(pot_values);
+    
+    // get_motor_current_positions();
+    // fix_motor_speeds();
+    delay_us(1); // Main loop delay
+  /* USER CODE END WHILE */
 
-    } else if (pot_values[2] > goal + margin) {
-    	if(pot_values[2] > goal + (8 * margin)){
-    		current_speed = -high_speed;
-    	} else {
-    		current_speed = -low_speed;
-    	}
-
-    } else {
-    	current_speed = 0;
-    }*/
-
-	get_motor_current_positions();
-	fix_motor_speeds();
-
-    if(counter == 100){
-    	counter = 0;
-    	current_time_us = get_time_us();
-    	usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id,
-    			pot_values[0], pot_values[1], pot_values[2], pot_values[3],
-				pot_values[4], pot_values[5], pot_values[6], pot_values[7],
-				pot_values[8], pot_values[9], pot_values[10], pot_values[11],
-				pot_values[12], pot_values[13], pot_values[14], pot_values[15]);
-    	send_can_hello(dip_id);
-    }
-
-    delay_ms(10); // Main loop delay, 10 ms
-
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
+  /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }

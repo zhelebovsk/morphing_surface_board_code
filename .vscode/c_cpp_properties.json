@@ -3,7 +3,9 @@
         {
             "name": "STM32",
             "includePath": [
+                "${workspaceFolder}/**",
                 "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Core/Src",
                 "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc",
                 "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy",
                 "${workspaceFolder}/Drivers/CMSIS/Include",
@@ -12,7 +14,8 @@
                 "${workspaceFolder}/Drivers/**",
                 "${workspaceFolder}/Middlewares/**",
                 "${workspaceFolder}/USB_Device/**",
-                "${workspaceFolder}/App/Inc"
+                "${workspaceFolder}/App/Inc/",
+                "${workspaceFolder}/App/Src/"
             ],
             "defines": [
                 "USE_HAL_DRIVER",
@@ -21,11 +24,13 @@
             "compilerPath": "arm-none-eabi-gcc",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "gcc-arm",
+            "intelliSenseMode": "linux-gcc-arm",
             "browse": {
                 "path": [
-                    "${workspaceFolder}/Core/Inc",
-                    "${workspaceFolder}/Drivers"
+                    "${workspaceFolder}/Core",
+                    "${workspaceFolder}/Drivers",
+                    "${workspaceFolder}/App",
+                    "${workspaceFolder}/USB_Device"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""

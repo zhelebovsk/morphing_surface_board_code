@@ -30,3 +30,7 @@ const uint32_t pwm_timer_channels[16] = {
   TIM_CHANNEL_1, TIM_CHANNEL_2, TIM_CHANNEL_3, TIM_CHANNEL_4,
   TIM_CHANNEL_1, TIM_CHANNEL_2, TIM_CHANNEL_3, TIM_CHANNEL_4
 };
+
+const uint8_t active_motors[14] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}; 
+uint16_t board_id = 0; 
+uint32_t current_time_us = 0;

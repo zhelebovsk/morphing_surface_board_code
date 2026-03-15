@@ -1,14 +1,5 @@
 #include "timer_helper.h"
 
-void fpga_timer_start(void) {
-  // FPGA clock start
-  // With ARR = 3, CCR3 = 2 → 2/4 = 50% (40 MHz clock)
-  TIM20->CCR3 = 2;
-  HAL_TIM_Base_Start(&htim20);
-  // Start CH3N (complementary output on PE6)
-  HAL_TIMEx_PWMN_Start(&htim20, TIM_CHANNEL_3);
-}
-
 uint32_t get_time_us(void) {
     return __HAL_TIM_GET_COUNTER(&htim2);
 }
