@@ -12,7 +12,14 @@ const int32_t pot_calibration_zero[16] =  {2048, 2048, 2048, 2048,
                                            2048, 2048, 2048, 2048,
                                            2048, 2048, 2048, 2048,
                                            2048, 2048, 2048, 2048};
-
+const int16_t up_speeds[MOTOR_AMOUNT] = {UP_SPEED, UP_SPEED, UP_SPEED, UP_SPEED,
+									UP_SPEED, UP_SPEED, UP_SPEED, UP_SPEED,
+									UP_SPEED, UP_SPEED, UP_SPEED, UP_SPEED,
+									UP_SPEED, UP_SPEED, UP_SPEED, UP_SPEED};
+const int16_t down_speeds[MOTOR_AMOUNT] = {DOWN_SPEED, DOWN_SPEED, DOWN_SPEED, DOWN_SPEED,
+											DOWN_SPEED, DOWN_SPEED, DOWN_SPEED, DOWN_SPEED,
+											DOWN_SPEED, DOWN_SPEED, DOWN_SPEED, DOWN_SPEED,
+											DOWN_SPEED, DOWN_SPEED, DOWN_SPEED, DOWN_SPEED,};
 
 // Power
 void motor_power_setup(uint8_t mode) {
@@ -119,9 +126,9 @@ void get_motor_current_positions(){
 
 void fix_motor_speeds(){
 	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		if(motor_speeds[i] == UP_SPEED && current_position[i] >= desired_position[i]){
+		if(motor_speeds[i] == up_speeds[i] && current_position[i] >= desired_position[i]){
 			motor_speeds[i] = 0;
-		}else if(motor_speeds[i] == DOWN_SPEED && current_position[i] <= desired_position[i]) {
+		}else if(motor_speeds[i] == down_speeds[i] && current_position[i] <= desired_position[i]) {
 			motor_speeds[i] = 0;
 		}
 	}
@@ -136,9 +143,9 @@ void motor_location_set(void* locations){
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 1048 + (loc *200);
 		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
+			motor_speeds[i] = up_speeds[i];
 		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
+			motor_speeds[i] = down_speeds[i];
 		}
 	}
 	return;
@@ -148,9 +155,9 @@ void motor_location_set(void* locations){
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 1536 + locations_arr[i];
 		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
+			motor_speeds[i] = up_speeds[i];
 		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
+			motor_speeds[i] = down_speeds[i];
 		}
 	}
 }
@@ -176,9 +183,9 @@ void zero_motors(){
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 2048 + motor_calib_fix[i];
 		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
+			motor_speeds[i] = up_speeds[i];
 		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
+			motor_speeds[i] = down_speeds[i];
 		}
 	}
 }

@@ -173,7 +173,7 @@ int main(void)
 	get_motor_current_positions();
 	fix_motor_speeds();
 
-    if(counter == 100){
+    if(counter == 20){
     	counter = 0;
     	current_time_us = get_time_us();
     	usb_printf("t: %lu DIP ID: %u running... Pot: %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u %4u\r\n", current_time_us, dip_id,
