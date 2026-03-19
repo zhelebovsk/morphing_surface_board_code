@@ -103,17 +103,24 @@ uint16_t current_position[MOTOR_AMOUNT];
 uint16_t desired_position[MOTOR_AMOUNT]; 
 uint16_t last_desired_position[MOTOR_AMOUNT];
 
-int16_t motor_speeds[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int16_t motor_speeds[MOTOR_AMOUNT];
+int16_t motor_speeds_up[MOTOR_AMOUNT];
+int16_t motor_speeds_down[MOTOR_AMOUNT];
+
+
+
 int16_t motor_calib_fix[MOTOR_AMOUNT] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 int mot = 0, scale = 64;
 
 void position_init(){
 	get_motor_current_positions();
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
+	for(int i = 0; i < MOTOR_AMOUNT; i++) {
 		desired_position[i] = current_position[i];
 		last_desired_position[i] = current_position[i];
 		motor_speeds[i] = 0;
+		motor_speeds_up[i] = UP_SPEED;
+		motor_speeds_down[i] = DOWN_SPEED;
 	}
 }
 
@@ -122,14 +129,16 @@ void get_motor_current_positions(){
 }
 
 void fix_motor_speeds(){
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		if(motor_speeds[i] == UP_SPEED && current_position[i] >= desired_position[i]){
+	for(int i = 0; i < MOTOR_AMOUNT; i++) {
+		if(motor_speeds[i] == motor_speeds_up[i] && 
+		   current_position[i] >= desired_position[i]){
 			motor_speeds[i] = 0;
-		}else if(motor_speeds[i] == DOWN_SPEED && current_position[i] <= desired_position[i]) {
+		} else if(motor_speeds[i] == motor_speeds_down[i] && 
+			      current_position[i] <= desired_position[i]) {
 			motor_speeds[i] = 0;
 		}
+		set_motor(i, motor_speeds[i]);
 	}
-	motor_speed_set();
 }
 
 void motors_location_set(uint16_t* locations) {
@@ -138,9 +147,9 @@ void motors_location_set(uint16_t* locations) {
 		last_desired_position[i] = desired_position[i];
 		desired_position[i] = 1536 + locations_arr[i];
 		if(desired_position[i] > last_desired_position[i]){
-			motor_speeds[i] = UP_SPEED;
+			motor_speeds[i] = motor_speeds_up[i];
 		}else if(desired_position[i] < last_desired_position[i]) {
-			motor_speeds[i] = DOWN_SPEED;
+			motor_speeds[i] = motor_speeds_down[i];
 		}
 	}
 }
@@ -149,16 +158,15 @@ void motor_location_set(uint8_t motor_id, uint16_t location) {
 	last_desired_position[motor_id] = desired_position[motor_id];
 	desired_position[motor_id] = 1536 + location;
 	if(desired_position[motor_id] > last_desired_position[motor_id]){
-		motor_speeds[motor_id] = UP_SPEED;
+		motor_speeds[motor_id] = motor_speeds_up[motor_id];
 	}else if(desired_position[motor_id] < last_desired_position[motor_id]) {
-		motor_speeds[motor_id] = DOWN_SPEED;
+		motor_speeds[motor_id] = motor_speeds_down[motor_id];
 	}
 }
 
-void motor_speed_set() {
-	for(int i = 0; i < MOTOR_AMOUNT; i++){
-		set_motor(i, motor_speeds[i]);
-	}
+void motor_speed_set(uint8_t motor_id, uint16_t speed_up, uint16_t speed_down) {
+	motor_speeds_up[motor_id] = speed_up;
+	motor_speeds_down[motor_id] = speed_down;
 }
 
 

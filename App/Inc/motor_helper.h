@@ -14,11 +14,8 @@ void motor_pwm_timers_start(void);
 
 //
 void fetch_potentiometer_values(uint16_t *pot_values);
-// void set_motor_direction(uint8_t motor_id, uint16_t dir_value);
-// void set_motor_power(uint8_t motor_id, uint16_t pwm_value);
 void set_motor(uint8_t motor_id, int16_t motor_set);
 
-// #define pos_res uint16_t
 
 #define MOTOR_AMOUNT 16
 #define UP_SPEED 50
@@ -29,7 +26,7 @@ void fix_motor_speeds();
 void motors_location_set(uint16_t* locations); 
 void motor_location_set(uint8_t motor_id, uint16_t location); 
 
-void motor_speed_set();
+void motor_speed_set(uint8_t motor_id, uint16_t speed_up, uint16_t speed_down);
 void position_init();
 
 void change_motor(bool right);
