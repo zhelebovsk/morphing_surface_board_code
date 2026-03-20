@@ -133,7 +133,6 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   position_init();
-  // zero_motors(); // TODO: DELETE! THIS IS FOR ZEROING ONLY
   while (1) {
     // usb_printf("t: %lu DIP ID: %u running... 
     // CAN_Send(board_id, &counter2, FDCAN_DLC_BYTES_1);

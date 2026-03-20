@@ -35,22 +35,54 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       return;
     }
     if (data[0] == 0x1) { 
-      for(int i = 0; i < 7; i++) motor_location_set(active_motors[i], data[i+1]*4); 
+      for(int i = 0; i < 7; i++) {
+        motor_location_set(active_motors[i], data[i+1]*4); 
+      }
     }
     if (data[0] == 0x2) { 
-      for(int i = 0; i < 7; i++) motor_location_set(active_motors[i+7], data[i+1]*4);
+      for(int i = 0; i < 7; i++) {
+        motor_location_set(active_motors[i+7], data[i+1]*4); 
+      }
     }
     if (data[0] == 0x3) { 
-        for(int i = 0; i < 7; i++) motor_speed_set(active_motors[i+1], data[i+1], data[i+1]);
+        for(int i = 0; i < 7; i++) {
+          motor_speed_set(active_motors[i+1], data[i+1], data[i+1]); 
+        }
     }
     if (data[0] == 0x4) { 
-        for(int i = 0; i < 7; i++) motor_speed_set(active_motors[i+7], data[i+1], data[i+1]);
+        for(int i = 0; i < 7; i++) {
+          motor_speed_set(active_motors[i+7], data[i+1], data[i+1]); 
+        }
     }
     if (data[0] == 0x5) { 
-        for(int i = 0; i < 7; i++) set_motor(active_motors[i], data[i+1]*2-255);
+        for(int i = 0; i < 7; i++) {
+          motor_speed_up_set(active_motors[i+1], data[i+1]); 
+        }
     }
     if (data[0] == 0x6) { 
-        for(int i = 0; i < 7; i++) set_motor(active_motors[i+7], data[i+1]*2-255);
+        for(int i = 0; i < 7; i++) {
+          motor_speed_up_set(active_motors[i+7], data[i+1]);
+        }
+    }
+    if (data[0] == 0x7) { 
+        for(int i = 0; i < 7; i++) {
+          motor_speed_down_set(active_motors[i+1], data[i+1]);
+        }
+    }
+    if (data[0] == 0x8) { 
+        for(int i = 0; i < 7; i++) {
+          motor_speed_down_set(active_motors[i+7], data[i+1]);
+        }
+    }
+    if (data[0] == 0xE) { 
+        for(int i = 0; i < 7; i++) {
+          set_motor(active_motors[i], data[i+1]*2-255);
+        }
+    }
+    if (data[0] == 0xF) { 
+        for(int i = 0; i < 7; i++) {
+          set_motor(active_motors[i+7], data[i+1]*2-255);
+        }
     }
   }
 }
