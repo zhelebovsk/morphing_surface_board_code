@@ -56,8 +56,11 @@ class MotorCommunication:
 
     def send_frame(self, data, board_id):
         # arbitration_id = board_id + 0x100
-        msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
-        self.bus.send(msg, timeout=0.1)
+        if(self.demo):
+            pass
+        else:
+            msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
+            self.bus.send(msg, timeout=0.1)
 
     def send(self, locations):
         # one board = one x-column in locations
