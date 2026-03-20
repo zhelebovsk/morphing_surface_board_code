@@ -37,8 +37,8 @@ if __name__ == "__main__":
                     for i, id in enumerate(BOARD_IDS):
                         data1 = positions_to_set[i, :7]
                         data2 = positions_to_set[i, 7:]
-                        data1 = np.concatenate([np.array([5], dtype=np.uint8), data1], dtype=np.uint8)
-                        data2 = np.concatenate([np.array([6], dtype=np.uint8), data2], dtype=np.uint8)
+                        data1 = np.concatenate([np.array([1], dtype=np.uint8), data1], dtype=np.uint8)
+                        data2 = np.concatenate([np.array([2], dtype=np.uint8), data2], dtype=np.uint8)
                         data1 = data1.tobytes()
                         data2 = data2.tobytes()
                         send_frame(data2, bus, id)

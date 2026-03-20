@@ -18,8 +18,8 @@ void set_motor(uint8_t motor_id, int16_t motor_set);
 
 
 #define MOTOR_AMOUNT 16
-#define UP_SPEED 50
-#define DOWN_SPEED -50
+#define UP_SPEED -50
+#define DOWN_SPEED 50
 
 void get_motor_current_positions();
 void fix_motor_speeds();
