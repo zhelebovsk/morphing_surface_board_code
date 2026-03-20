@@ -1,0 +1,543 @@
+import time
+import can
+import os
+from tkinter import (
+    Tk, Frame, Canvas, Button, LEFT, RIGHT, LabelFrame,
+    Radiobutton, IntVar, Entry, messagebox, Label,
+    Spinbox, BooleanVar, StringVar, OptionMenu
+)
+from math import sin, pi, ceil
+
+
+class WingControl:
+    # moved real state into __init__
+
+    def __init__(self, range_of_motion, x_size, y_size, offset=0):
+        self.zero = range_of_motion / 2
+        self.locations = []
+        self.x_size = x_size   # x = board index
+        self.y_size = y_size   # y = motor index inside board
+        self.offset = offset
+
+        for x in range(x_size):
+            self.locations.append([self.zero + offset] * y_size)
+
+    def selfZero(self):
+        for x in range(self.x_size):
+            for y in range(self.y_size):
+                self.locations[x][y] = self.zero + self.offset
+
+    def assembleFunction(self, xy_func, x_increment, y_increment, x_start=0, y_start=0):
+        # locations[x][y] : x = board , y = motor inboard
+        for x in range(self.x_size):
+            for y in range(self.y_size):
+                raw_func_value = xy_func(
+                    x_start + (x * x_increment),
+                    y_start + (y * y_increment)
+                )
+
+                scaled_value = raw_func_value * self.zero + self.zero + self.offset
+                self.locations[x][y] = scaled_value
+
+
+class MotorCommunication:
+    # port now means CAN channel
+
+    def __init__(self, port):
+        self.bus = None
+        self.demo = (port == "DEMO-MODE")
+
+        if not self.demo:
+            try:
+                self.bus = can.interface.Bus(channel=port, interface="socketcan")
+            except OSError:
+                print("Your CAN sucks")
+                self.demo = True
+
+    def send_frame(self, data, board_id):
+        # arbitration_id = board_id + 0x100
+        msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
+        self.bus.send(msg, timeout=0.1)
+
+    def send(self, locations):
+        # one board = one x-column in locations
+        # locations[board][motor]
+        board_count = len(locations)
+        motors_per_board = len(locations[0])
+
+        if motors_per_board != 14:
+            print(f"ERROR: expected 14 motors per board, got {motors_per_board}")
+            return
+
+        for board_index in range(board_count):
+            board_id = board_index + 1
+
+            # first packet: mission 5 + motors 0..6
+            data1 = bytes(
+                [14] +
+                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7)]
+            )
+
+            # second packet: mission 6 + motors 7..13
+            data2 = bytes(
+                [15] +
+                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7, 14)]
+            )
+
+            if self.bus != "DEMO":
+                # send data2 first, then data1
+                self.send_frame(data2, board_id)
+                self.send_frame(data1, board_id)
+            else:
+                raw1 = [locations[board_index][motor] for motor in range(7)]
+                raw2 = [locations[board_index][motor] for motor in range(7, 14)]
+                #old prints for checks
+                #print("BOARD", board_id, "RAW1", raw1)
+                #print("BOARD", board_id, "RAW2", raw2)
+                #print("ID:", hex(board_id + 0x100), "DATA:", data2.hex())
+                #print("ID:", hex(board_id + 0x100), "DATA:", data1.hex())
+
+
+class ControlGUI:
+    # Constants for function choice
+    MIN = 0
+    ZERO = 1
+    MAX = 2
+    SIN_X = 3
+    SIN_Y = 4
+    SIN_X_SIN_Y = 5
+    CUSTOM = 6
+
+    def __init__(self, port, range_of_motion, width=14, length=30, offset=0):
+        # width = 14 motors per board
+        # length = 30 boards
+        # WingControl stores locations[board][motor]
+        self.wing_control = WingControl(range_of_motion, length, width, offset)
+        self.communication = MotorCommunication(port)
+
+        self.window = Tk()
+        self.window.title("Motor Control")
+        self.window.geometry("1136x612")
+        self.window.resizable(False, False)
+
+        self.motor_representation = []
+        self.dynamic_on = []
+        self.dynamic_off = []
+        self.choice = IntVar(value=self.ZERO)
+        self.dynamically_running = BooleanVar()
+
+        self.control_panel_setup()
+        self.visual_motor_setup(width, length)
+
+    def control_panel_setup(self):
+        control_panel = Frame(self.window, name="control_panel")
+        control_panel.pack(side=LEFT)
+
+        func_options = LabelFrame(control_panel, text="function options", name="func_options")
+        func_options.pack()
+
+        function_options = []
+
+        function_options.append(Radiobutton(func_options, text="min", variable=self.choice, value=self.MIN))
+        function_options.append(Radiobutton(func_options, text="zero", variable=self.choice, value=self.ZERO))
+        function_options.append(Radiobutton(func_options, text="max", variable=self.choice, value=self.MAX))
+        function_options.append(Radiobutton(func_options, text="sin x", variable=self.choice, value=self.SIN_X))
+        function_options.append(Radiobutton(func_options, text="sin y", variable=self.choice, value=self.SIN_Y))
+        function_options.append(Radiobutton(func_options, text="sin x * sin y", variable=self.choice, value=self.SIN_X_SIN_Y))
+        function_options.append(Radiobutton(func_options, text="custom", variable=self.choice, value=self.CUSTOM))
+
+        for radio_button in function_options:
+            radio_button.pack()
+
+        custom = Entry(func_options, name="custom")
+        custom.pack()
+        self.dynamic_off.append(custom)
+
+        run_options = LabelFrame(control_panel, text="run options", name="run_options")
+        run_options.pack()
+
+        static_btn = Button(run_options, text="run statically", command=lambda: self.runStatic())
+        static_btn.pack()
+        self.dynamic_off.append(static_btn)
+
+        self.dynamically_running = BooleanVar()
+
+        dynamic_start_btn = Button(
+            run_options,
+            text="start running dynamically",
+            command=lambda: self.startDynamic(int(delay_val.get()))
+        )
+        dynamic_start_btn.pack()
+        self.dynamic_off.append(dynamic_start_btn)
+
+        dynamic_stop_btn = Button(
+            run_options,
+            text="stop running dynamically",
+            state="disabled",
+            command=lambda: self.stopDynamic()
+        )
+        dynamic_stop_btn.pack()
+        self.dynamic_on.append(dynamic_stop_btn)
+
+        delay_lbl = Label(run_options, text="delay(ms):")
+        delay_lbl.pack()
+
+        delay_val = Spinbox(run_options, from_=5, to=20000, increment=5, name="delay_val")
+        delay_val.pack()
+
+        advanced_options = LabelFrame(control_panel, text="advanced options", name="advanced_options")
+        advanced_options.pack()
+
+        motor_increment_options = LabelFrame(
+            advanced_options,
+            text="motor increments",
+            name="motor_increment_options"
+        )
+        motor_increment_options.pack()
+
+        x_motor_lbl = Label(motor_increment_options, text="x axis:")
+        x_motor_lbl.pack()
+        x_motor_increment = Entry(motor_increment_options, name="x_motor_increment")
+        x_motor_increment.insert(0, "pi/12")
+        x_motor_increment.pack()
+
+        y_motor_lbl = Label(motor_increment_options, text="y axis:")
+        y_motor_lbl.pack()
+        y_motor_increment = Entry(motor_increment_options, name="y_motor_increment")
+        y_motor_increment.insert(0, "pi/12")
+        y_motor_increment.pack()
+
+        time_increment_options = LabelFrame(
+            advanced_options,
+            text="time increments",
+            name="time_increment_options"
+        )
+        time_increment_options.pack()
+
+        x_time_lbl = Label(time_increment_options, text="x axis:")
+        x_time_lbl.pack()
+        x_time_increment = Entry(time_increment_options, name="x_time_increment")
+        x_time_increment.insert(0, "pi/12")
+        x_time_increment.pack()
+
+        y_time_lbl = Label(time_increment_options, text="y axis:")
+        y_time_lbl.pack()
+        y_time_increment = Entry(time_increment_options, name="y_time_increment")
+        y_time_increment.insert(0, "pi/12")
+        y_time_increment.pack()
+
+    def visual_motor_setup(self, width, length):
+        # visual layout draws width rows and length columns.
+        # Since one board is one column, that matches the GUI meaning.
+        visual_motors = Frame(self.window)
+        visual_motors.pack(side=RIGHT)
+
+        counter = 0
+        canvas_size = ceil(min((375 / width), (750 / length)))
+
+        for yCount in range(width):
+            for xCount in range(length):
+                self.motor_representation.append(
+                    Canvas(visual_motors, height=canvas_size, width=canvas_size, bg="green")
+                )
+                self.motor_representation[counter].grid(
+                    row=yCount, column=xCount, padx=0, pady=0, ipadx=0, ipady=0
+                )
+                counter += 1
+
+    def functionParser(self):
+        if self.choice.get() == self.MIN:
+            func = lambda x, y: -1
+        elif self.choice.get() == self.ZERO:
+            func = lambda x, y: 0
+        elif self.choice.get() == self.MAX:
+            func = lambda x, y: 1
+        elif self.choice.get() == self.SIN_X:
+            func = lambda x, y: sin(x)
+        elif self.choice.get() == self.SIN_Y:
+            func = lambda x, y: sin(y)
+        elif self.choice.get() == self.SIN_X_SIN_Y:
+            func = lambda x, y: sin(x) * sin(y)
+        elif self.choice.get() == self.CUSTOM:
+            # still uses eval, this is not safe for untrusted input
+            func = lambda x, y: eval(
+                self.window.children.get("control_panel")
+                .children.get("func_options")
+                .children.get("custom").get()
+            )
+        else:
+            messagebox.showwarning(
+                "Function Choice Error",
+                "An error has occurred while trying to parse the radio box data.\n"
+                "Falling back to zero."
+            )
+            func = lambda x, y: 0
+        return func
+
+    def recolor(self):
+        counter = 0
+        for y in range(self.wing_control.y_size):
+            for x in range(self.wing_control.x_size):
+                # clamp to 0..255 so bad values don't break color generation
+                grayscale = round(
+                    255 *
+                    (self.wing_control.locations[x][y] - self.wing_control.offset)
+                    / (self.wing_control.zero * 2)
+                )
+                grayscale = max(0, min(255, grayscale))
+                location_value_hex = hex(grayscale)[2:]
+                if len(location_value_hex) < 2:
+                    location_value_hex = "0" + location_value_hex
+                self.motor_representation[counter]["bg"] = "#" + location_value_hex * 3
+                counter += 1
+
+    def update(self):
+        self.communication.send(self.wing_control.locations)
+        self.recolor()
+
+    def runStatic(self):
+        func = self.functionParser()
+
+        try:
+            x_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("motor_increment_options")
+                .children.get("x_motor_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "x Motor Increment Error",
+                "An error has occurred while trying to calculate the x motor increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            x_inc = pi / 12
+
+        try:
+            y_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("motor_increment_options")
+                .children.get("y_motor_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "y Motor Increment Error",
+                "An error has occurred while trying to calculate the y motor increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            y_inc = pi / 12
+
+        try:
+            self.wing_control.assembleFunction(func, x_inc, y_inc)
+        except Exception as exception:
+            messagebox.showwarning(
+                "Custom Function Error",
+                "An error has occurred while trying to calculate the motor values.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            self.wing_control.selfZero()
+
+        self.update()
+
+    def startDynamic(self, delay):
+        for widget in self.dynamic_on:
+            widget["state"] = "normal"
+        for widget in self.dynamic_off:
+            widget["state"] = "disabled"
+
+        self.dynamically_running.set(True)
+        func = self.functionParser()
+
+        try:
+            x_motor_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("motor_increment_options")
+                .children.get("x_motor_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "x Motor Increment Error",
+                "An error has occurred while trying to calculate the x motor increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            x_motor_inc = pi / 12
+
+        try:
+            y_motor_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("motor_increment_options")
+                .children.get("y_motor_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "y Motor Increment Error",
+                "An error has occurred while trying to calculate the y motor increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            y_motor_inc = pi / 12
+
+        try:
+            x_time_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("time_increment_options")
+                .children.get("x_time_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "x Time Increment Error",
+                "An error has occurred while trying to calculate the x time increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            x_time_inc = pi / 12
+
+        try:
+            y_time_inc = eval(
+                self.window.children.get("control_panel")
+                .children.get("advanced_options")
+                .children.get("time_increment_options")
+                .children.get("y_time_increment").get()
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "y Time Increment Error",
+                "An error has occurred while trying to calculate the y time increment.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            y_time_inc = pi / 12
+
+        self.runDynamic(func, delay, x_motor_inc, y_motor_inc, x_time_inc, y_time_inc)
+
+    def runDynamic(self, func, delay, x_motor_inc, y_motor_inc, x_time_inc, y_time_inc, shift=0):
+        try:
+            self.wing_control.assembleFunction(
+                func,
+                x_motor_inc,
+                y_motor_inc,
+                shift * x_time_inc,
+                shift * y_time_inc
+            )
+        except Exception as exception:
+            messagebox.showwarning(
+                "Custom Function Error",
+                "An error has occurred while trying to calculate the motor values.\n"
+                "ERROR TYPE: {0}\n"
+                "ERROR: {1}".format(type(exception), exception)
+            )
+            self.wing_control.selfZero()
+            self.choice.set(self.ZERO)
+            self.stopDynamic()
+
+        self.update()
+
+        if self.dynamically_running.get():
+            self.window.after(
+                delay,
+                lambda: self.runDynamic(
+                    func, delay,
+                    x_motor_inc, y_motor_inc,
+                    x_time_inc, y_time_inc,
+                    shift + 1
+                )
+            )
+
+    def stopDynamic(self):
+        for widget in self.dynamic_on:
+            widget["state"] = "disabled"
+        for widget in self.dynamic_off:
+            widget["state"] = "normal"
+        self.dynamically_running.set(False)
+
+    def start(self):
+        self.window.mainloop()
+
+
+class SetupGUI:
+    def __init__(self):
+        # demo is now just the first option, always present
+        # we can add more demo channels here if needed
+        ports_list = ["DEMO-MODE"]
+
+        for name in os.listdir("/sys/class/net"):
+            if name.startswith("can") or name.startswith("vcan") or name.startswith("slcan"):
+                ports_list.append(name)
+        self.setting_popup = Tk()
+        self.setting_popup.title("gui setup")
+        self.setting_popup.geometry("500x70")
+        self.setting_popup.resizable(False, False)
+
+        self.com_choice = StringVar()
+        self.width_choice = IntVar()
+        self.length_choice = IntVar()
+        self.start = False
+
+        self.visuals(ports_list)
+        self.setting_popup.mainloop()
+
+    def visuals(self, port_list):
+        # label changed from Serial COM to CAN channel
+        com_label = Label(self.setting_popup, text="CAN channel: ")
+        com_label.pack(side=LEFT)
+
+        self.com_choice.set(port_list[0])
+        com_options = OptionMenu(self.setting_popup, self.com_choice, *port_list)
+        com_options.pack(side=LEFT)
+
+        width_label = Label(self.setting_popup, text="Width: ")
+        width_label.pack(side=LEFT)
+        self.width_choice.set(14)
+        width_val = Spinbox(
+            self.setting_popup,
+            from_=1, to=50, increment=1,
+            textvariable=self.width_choice,
+            width=3
+        )
+        width_val.pack(side=LEFT)
+
+        length_label = Label(self.setting_popup, text="Length: ")
+        length_label.pack(side=LEFT)
+        self.length_choice.set(30)
+        length_val = Spinbox(
+            self.setting_popup,
+            from_=1, to=82, increment=1,
+            textvariable=self.length_choice,
+            width=3
+        )
+        length_val.pack(side=LEFT)
+
+        start_btn = Button(self.setting_popup, text="Start", command=lambda: self.start_btn_cmd())
+        start_btn.pack(side=LEFT)
+
+    def start_btn_cmd(self):
+        self.start = True
+        self.setting_popup.destroy()
+
+    def get(self):
+        return self.com_choice.get(), self.width_choice.get(), self.length_choice.get()
+
+
+if __name__ == "__main__":
+    setup = SetupGUI()
+
+    if setup.start:
+        port, width, length = setup.get()
+
+        # range_of_motion kept as example value.
+        # change it to real hardware range if needed.
+        app = ControlGUI(
+            port=port,
+            range_of_motion=255,
+            width=int(width),   # should be 14
+            length=int(length)  # should be 30
+        )
+        app.start()
