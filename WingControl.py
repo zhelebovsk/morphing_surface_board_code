@@ -3,7 +3,7 @@ import os
 from tkinter import (
     Tk, Frame, Canvas, Button, LEFT, RIGHT, LabelFrame,
     Radiobutton, IntVar, Entry, messagebox, Label,
-    Spinbox, BooleanVar, StringVar, OptionMenu
+    Spinbox, BooleanVar, StringVar, OptionMenu, Toplevel, Scale, HORIZONTAL
 )
 from math import sin, pi, ceil
 
@@ -52,6 +52,29 @@ class MotorCommunication:
         if not self.demo:
             msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
             self.bus.send(msg, timeout=0.1)
+        else:
+            print(can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False))
+
+    def send_motor_speed_packet(self, board_id, motor_speeds, motor_index, is_up):
+        if motor_index < 7: #
+            motor_range = range(7)
+            command = 5 if is_up else 7
+        else:
+            motor_range = range(7, 14)
+            command = 6 if is_up else 8
+
+        if is_up:
+            values = [max(0, min(255, int(motor_speeds[board_id - 1][m]["up"])))
+                for m in motor_range
+            ]
+        else:
+            values = [max(0, min(255, int(motor_speeds[board_id - 1][m]["down"])))
+                          for m in motor_range
+            ]
+
+        self.send_frame(bytes([command] + values), board_id)
+
+
 
     def send(self, locations):
         #one board = one column of 14 motors, locations represented as [board][motor]
@@ -99,7 +122,7 @@ class ControlGUI:
 
         self.window = Tk()
         self.window.title("Motor Control")
-        self.window.geometry("1136x612")
+        #self.window.geometry("1136x612")
         self.window.resizable(False, False)
 
         self.motor_representation = []
@@ -110,6 +133,8 @@ class ControlGUI:
 
         self.control_panel_setup()
         self.visual_motor_setup(width, length)
+
+        self.motor_speeds = [[{"up": 50, "down": 50} for _ in range(width)]for _ in range(length)]
 
     def control_panel_setup(self):
         control_panel = Frame(self.window, name="control_panel")
@@ -209,23 +234,28 @@ class ControlGUI:
         y_time_increment.pack()
 
     def visual_motor_setup(self, width, length):
-        # visual layout draws width rows and length columns.
-        # Since one board is one column, that matches the GUI meaning.
         visual_motors = Frame(self.window)
         visual_motors.pack(side=RIGHT)
 
-        counter = 0
+        self.motor_representation = []
         canvas_size = ceil(min((375 / width), (750 / length)))
 
-        for yCount in range(width):
-            for xCount in range(length):
-                self.motor_representation.append(
-                    Canvas(visual_motors, height=canvas_size, width=canvas_size, bg="green")
+        for motor_index in range(width):
+            row_list = []
+            for board_index in range(length):
+                canvas = Canvas(
+                    visual_motors,
+                    height=canvas_size,
+                    width=canvas_size,
+                    bg="green"
                 )
-                self.motor_representation[counter].grid(
-                    row=yCount, column=xCount, padx=0, pady=0, ipadx=0, ipady=0
+                canvas.grid(row=motor_index, column=board_index, padx=0, pady=0, ipadx=0, ipady=0)
+                canvas.bind(
+                    "<Button>",
+                    lambda event, b=board_index, m=motor_index: self.open_motor_speed_window(b, m)
                 )
-                counter += 1
+                row_list.append(canvas)
+            self.motor_representation.append(row_list)
 
     def functionParser(self):
         if self.choice.get() == self.MIN:
@@ -257,25 +287,74 @@ class ControlGUI:
         return func
 
     def recolor(self):
-        counter = 0
-        for y in range(self.wing_control.y_size):
-            for x in range(self.wing_control.x_size):
-                # clamp to 0..255 so bad values don't break color generation
+        for motor_index in range(self.wing_control.y_size):
+            for board_index in range(self.wing_control.x_size):
                 grayscale = round(
                     255 *
-                    (self.wing_control.locations[x][y] - self.wing_control.offset)
+                    (self.wing_control.locations[board_index][motor_index] - self.wing_control.offset)
                     / (self.wing_control.zero * 2)
                 )
                 grayscale = max(0, min(255, grayscale))
-                location_value_hex = hex(grayscale)[2:]
-                if len(location_value_hex) < 2:
-                    location_value_hex = "0" + location_value_hex
-                self.motor_representation[counter]["bg"] = "#" + location_value_hex * 3
-                counter += 1
+                hex_value = f"{grayscale:02x}"
+                self.motor_representation[motor_index][board_index]["bg"] = "#" + hex_value * 3
 
     def update(self):
         self.communication.send(self.wing_control.locations)
         self.recolor()
+
+    def open_motor_speed_window(self, board_index, motor_index):
+        window = Toplevel(self.window)
+        window.title(f"Board {board_index + 1}, Motor {motor_index + 1}")
+        window.resizable(False, False)
+
+        current = self.motor_speeds[board_index][motor_index]
+
+        up_var = IntVar(value=current["up"])
+        down_var = IntVar(value=current["down"])
+
+        Label(window, text=f"Board {board_index + 1}  Motor {motor_index + 1}").pack(padx=10, pady=5)
+
+        Label(window, text="Up speed").pack()
+        Scale(
+            window,
+            from_=0,
+            to=255,
+            resolution=5,
+            orient="horizontal",
+            variable=up_var,
+            length=250
+        ).pack(padx=10)
+
+        Label(window, text="Down speed").pack()
+        Scale(
+            window,
+            from_=0,
+            to=255,
+            resolution=5,
+            orient="horizontal",
+            variable=down_var,
+            length=250
+        ).pack(padx=10)
+
+        def save_and_close():
+            old_up = self.motor_speeds[board_index][motor_index]["up"]
+            old_down = self.motor_speeds[board_index][motor_index]["down"]
+
+            new_up = max(0, min(255, 5 * round(up_var.get() / 5)))
+            new_down = max(0, min(255, 5 * round(down_var.get() / 5)))
+
+            self.motor_speeds[board_index][motor_index]["up"] = new_up
+            self.motor_speeds[board_index][motor_index]["down"] = new_down
+
+            if new_up != old_up:
+                self.communication.send_motor_speed_packet(board_index + 1, self.motor_speeds, motor_index, is_up=True)
+
+            if new_down != old_down:
+                self.communication.send_motor_speed_packet(board_index + 1, self.motor_speeds, motor_index, is_up=False)
+
+            window.destroy()
+
+        Button(window, text="Save", command=save_and_close).pack(pady=10)
 
     def runStatic(self):
         func = self.functionParser()
