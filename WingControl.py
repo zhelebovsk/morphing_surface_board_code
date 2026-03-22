@@ -1,4 +1,3 @@
-import time
 import can
 import os
 from tkinter import (
@@ -8,9 +7,8 @@ from tkinter import (
 )
 from math import sin, pi, ceil
 
-
+#This class calculated the changes in the (simulation) board
 class WingControl:
-    # moved real state into __init__
 
     def __init__(self, range_of_motion, x_size, y_size, offset=0):
         self.zero = range_of_motion / 2
@@ -31,40 +29,32 @@ class WingControl:
         # locations[x][y] : x = board , y = motor inboard
         for x in range(self.x_size):
             for y in range(self.y_size):
-                raw_func_value = xy_func(
-                    x_start + (x * x_increment),
-                    y_start + (y * y_increment)
-                )
-
+                raw_func_value = xy_func(x_start + (x * x_increment),y_start + (y * y_increment))
                 scaled_value = raw_func_value * self.zero + self.zero + self.offset
                 self.locations[x][y] = scaled_value
 
 
+#
 class MotorCommunication:
-    # port now means CAN channel
-
-    def __init__(self, port):
+    def __init__(self, chan):
         self.bus = None
-        self.demo = (port == "DEMO-MODE")
+        self.demo = (chan == "DEMO-MODE")
 
         if not self.demo:
             try:
-                self.bus = can.interface.Bus(channel=port, interface="socketcan")
+                self.bus = can.interface.Bus(channel=chan, interface="socketcan")
             except OSError:
                 print("Your CAN sucks")
                 self.demo = True
 
     def send_frame(self, data, board_id):
-        # arbitration_id = board_id + 0x100
-        if(self.demo):
-            pass
-        else:
+
+        if not self.demo:
             msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
             self.bus.send(msg, timeout=0.1)
 
     def send(self, locations):
-        # one board = one x-column in locations
-        # locations[board][motor]
+        #one board = one column of 14 motors, locations represented as [board][motor]
         board_count = len(locations)
         motors_per_board = len(locations[0])
 
@@ -75,34 +65,24 @@ class MotorCommunication:
         for board_index in range(board_count):
             board_id = board_index + 1
 
-            # first packet: mission 5 + motors 0..6
-            data1 = bytes(
-                [14] +
-                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7)]
-            )
+            #first packet: first byte is 14 + motors 0..6
+            data1 = bytes([14] +
+                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7)])
 
-            # second packet: mission 6 + motors 7..13
-            data2 = bytes(
-                [15] +
-                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7, 14)]
-            )
+            #second packet: first byte is 15 + motors 7...13
+            data2 = bytes([15] +
+                [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7, 14)])
 
             if self.bus != "DEMO":
                 # send data2 first, then data1
                 self.send_frame(data2, board_id)
                 self.send_frame(data1, board_id)
-            else:
-                raw1 = [locations[board_index][motor] for motor in range(7)]
-                raw2 = [locations[board_index][motor] for motor in range(7, 14)]
-                #old prints for checks
-                #print("BOARD", board_id, "RAW1", raw1)
-                #print("BOARD", board_id, "RAW2", raw2)
-                #print("ID:", hex(board_id + 0x100), "DATA:", data2.hex())
-                #print("ID:", hex(board_id + 0x100), "DATA:", data1.hex())
+
+
 
 
 class ControlGUI:
-    # Constants for function choice
+    #Constants for function choice
     MIN = 0
     ZERO = 1
     MAX = 2
@@ -111,12 +91,11 @@ class ControlGUI:
     SIN_X_SIN_Y = 5
     CUSTOM = 6
 
-    def __init__(self, port, range_of_motion, width=14, length=30, offset=0):
-        # width = 14 motors per board
-        # length = 30 boards
-        # WingControl stores locations[board][motor]
+    def __init__(self, chan, range_of_motion, width=14, length=30, offset=0):
+
+        #locations represented as [board][motor]
         self.wing_control = WingControl(range_of_motion, length, width, offset)
-        self.communication = MotorCommunication(port)
+        self.communication = MotorCommunication(chan)
 
         self.window = Tk()
         self.window.title("Motor Control")
@@ -467,61 +446,48 @@ class ControlGUI:
 
 class SetupGUI:
     def __init__(self):
-        # demo is now just the first option, always present
-        # we can add more demo channels here if needed
-        ports_list = ["DEMO-MODE"]
+        self.channels = self.find_channels()
 
-        for name in os.listdir("/sys/class/net"):
-            if name.startswith("can") or name.startswith("vcan") or name.startswith("slcan"):
-                ports_list.append(name)
         self.setting_popup = Tk()
-        self.setting_popup.title("gui setup")
+        self.setting_popup.title("GUI setup")
         self.setting_popup.geometry("500x70")
         self.setting_popup.resizable(False, False)
 
-        self.com_choice = StringVar()
-        self.width_choice = IntVar()
-        self.length_choice = IntVar()
+        self.com_choice = StringVar(value=self.channels[0])
+        self.width_choice = IntVar(value=14)
+        self.length_choice = IntVar(value=30)
         self.start = False
 
-        self.visuals(ports_list)
+
+
+        self.widgets()
         self.setting_popup.mainloop()
 
-    def visuals(self, port_list):
-        # label changed from Serial COM to CAN channel
-        com_label = Label(self.setting_popup, text="CAN channel: ")
-        com_label.pack(side=LEFT)
+    def find_channels(self):
+        channels = ["DEMO-MODE"]
+        try:
+            for name in os.listdir("/sys/class/net"):
+                if name.startswith(("can", "vcan", "slcan")):
+                    channels.append(name)
+        except OSError:
+            pass
+        return channels
 
-        self.com_choice.set(port_list[0])
-        com_options = OptionMenu(self.setting_popup, self.com_choice, *port_list)
-        com_options.pack(side=LEFT)
+    def widgets(self):
 
-        width_label = Label(self.setting_popup, text="Width: ")
-        width_label.pack(side=LEFT)
-        self.width_choice.set(14)
-        width_val = Spinbox(
-            self.setting_popup,
-            from_=1, to=50, increment=1,
-            textvariable=self.width_choice,
-            width=3
-        )
-        width_val.pack(side=LEFT)
+        Label(self.setting_popup, text="CAN channel:").pack(side=LEFT)
+        OptionMenu(self.setting_popup, self.com_choice, *self.channels).pack(side=LEFT)
 
-        length_label = Label(self.setting_popup, text="Length: ")
-        length_label.pack(side=LEFT)
-        self.length_choice.set(30)
-        length_val = Spinbox(
-            self.setting_popup,
-            from_=1, to=82, increment=1,
-            textvariable=self.length_choice,
-            width=3
-        )
-        length_val.pack(side=LEFT)
+        Label(self.setting_popup, text="Width:").pack(side=LEFT)
+        Spinbox(self.setting_popup, from_=1, to=50, textvariable=self.width_choice, width=3).pack(side=LEFT)
 
-        start_btn = Button(self.setting_popup, text="Start", command=lambda: self.start_btn_cmd())
-        start_btn.pack(side=LEFT)
+        Label(self.setting_popup, text="Length:").pack(side=LEFT)
+        Spinbox(self.setting_popup, from_=1, to=82, textvariable=self.length_choice, width=3).pack(side=LEFT)
 
-    def start_btn_cmd(self):
+        Button(self.setting_popup, text="Start", command=self.on_start).pack(side=LEFT)
+
+
+    def on_start(self):
         self.start = True
         self.setting_popup.destroy()
 
@@ -533,14 +499,14 @@ if __name__ == "__main__":
     setup = SetupGUI()
 
     if setup.start:
-        port, width, length = setup.get()
+        chan, width, length = setup.get()
 
         # range_of_motion kept as example value.
-        # change it to real hardware range if needed.
+        # we will need to change it to real hardware range if needed.
         app = ControlGUI(
-            port=port,
+            chan=chan,
             range_of_motion=255,
-            width=int(width),   # should be 14
-            length=int(length)  # should be 30
+            width=int(width),   # should be 14 for the experiment
+            length=int(length)  # should be 30 for the experiment?
         )
         app.start()
