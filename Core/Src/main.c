@@ -142,7 +142,7 @@ int main(void)
     
     get_motor_current_positions();
     fix_motor_speeds();
-    delay_us(1); // Main loop delay
+    // delay_us(1); // Main loop delay
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */

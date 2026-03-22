@@ -44,16 +44,16 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         motor_location_set(active_motors[i+7], data[i+1]*4); 
       }
     }
-    if (data[0] == 0x3) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_set(active_motors[i+1], data[i+1], data[i+1]); 
-        }
-    }
-    if (data[0] == 0x4) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_set(active_motors[i+7], data[i+1], data[i+1]); 
-        }
-    }
+    // if (data[0] == 0x3) { 
+    //     for(int i = 0; i < 7; i++) {
+    //       motor_speed_set(active_motors[i+1], data[i+1], data[i+1]); 
+    //     }
+    // }
+    // if (data[0] == 0x4) { 
+    //     for(int i = 0; i < 7; i++) {
+    //       motor_speed_set(active_motors[i+7], data[i+1], data[i+1]); 
+    //     }  
+    // }
     if (data[0] == 0x5) { 
         for(int i = 0; i < 7; i++) {
           motor_speed_up_set(active_motors[i+1], data[i+1]); 
@@ -73,6 +73,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         for(int i = 0; i < 7; i++) {
           motor_speed_down_set(active_motors[i+7], data[i+1]);
         }
+    }
+    if (data[0] == 0xD) { 
+      NVIC_SystemReset();
     }
     if (data[0] == 0xE) { 
         for(int i = 0; i < 7; i++) {

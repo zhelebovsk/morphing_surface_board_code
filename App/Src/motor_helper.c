@@ -168,13 +168,12 @@ void motor_speed_set(uint8_t motor_id, uint16_t speed_up, uint16_t speed_down) {
 	motor_speeds_up[motor_id] = speed_up;
 	motor_speeds_down[motor_id] = speed_down;
 }
-void motor_speed_up_set(uint8_t motor_id, uint16_t speed_up) {
-	motor_speeds_up[motor_id] = speed_up;
+void motor_speed_up_set(uint8_t motor_id, uint8_t speed_up) {
+	motor_speeds_up[motor_id] = -(int16_t)speed_up;
 }
-void motor_speed_down_set(uint8_t motor_id, uint16_t speed_down) {
-	motor_speeds_down[motor_id] = speed_down;
+void motor_speed_down_set(uint8_t motor_id, uint8_t speed_down) {
+	motor_speeds_down[motor_id] = (int16_t)speed_down;
 }
-
 
 void change_motor(bool right){
 	if ((right && mot == 15) || (!right && mot == 0)){
