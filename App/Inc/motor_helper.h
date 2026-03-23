@@ -27,8 +27,8 @@ void motors_location_set(uint16_t* locations);
 void motor_location_set(uint8_t motor_id, uint16_t location); 
 
 void motor_speed_set(uint8_t motor_id, uint16_t speed_up, uint16_t speed_down);
-void motor_speed_up_set(uint8_t motor_id, uint16_t speed_up);
-void motor_speed_down_set(uint8_t motor_id, uint16_t speed_down);
+void motor_speed_up_set(uint8_t motor_id, uint8_t speed_up);
+void motor_speed_down_set(uint8_t motor_id, uint8_t speed_down);
 
 void position_init();
 

@@ -140,7 +140,7 @@ int main(void)
     // CAN_Send_Pot(board_id, pot_values);
     // fetch_potentiometer_values(pot_values);
     
-    get_motor_current_positions();
+    // get_motor_current_positions();
     fix_motor_speeds();
     // delay_us(1); // Main loop delay
   /* USER CODE END WHILE */
