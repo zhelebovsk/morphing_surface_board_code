@@ -7,7 +7,7 @@ from tkinter import (
 )
 from math import sin, pi, ceil
 
-#calculates the locations of each motor in each wing
+# calculates the locations of each motor in each wing
 class WingControl:
     def __init__(self, range_of_motion, board_count, motors_per_board, offset=0):
         self.zero = range_of_motion / 2
@@ -106,6 +106,8 @@ class ControlGUI:
     UPDATE_DT = 1.0 / UPDATE_HZ
     UPDATE_MS = int(1000 / UPDATE_HZ)
 
+    MOTOR_SPACING_MM = 10.0
+
     def __init__(self, channel, range_of_motion, width=14, length=30, offset=0):
         self.board_count = length
         self.motors_per_board = width
@@ -130,8 +132,12 @@ class ControlGUI:
 
         self.fx = DoubleVar(value=0.5)
         self.fy = DoubleVar(value=0.5)
-        self.lambda_x = DoubleVar(value=max(1.0, length / 2))
-        self.lambda_y = DoubleVar(value=max(1.0, width / 2))
+
+        default_lambda_x_mm = max(self.MOTOR_SPACING_MM, (self.board_count) * self.MOTOR_SPACING_MM)
+        default_lambda_y_mm = max(self.MOTOR_SPACING_MM, (self.motors_per_board) * self.MOTOR_SPACING_MM)
+
+        self.lambda_x = DoubleVar(value=default_lambda_x_mm)
+        self.lambda_y = DoubleVar(value=default_lambda_y_mm)
 
         self.function_label_var = StringVar()
         self.speed_label_var = StringVar()
@@ -139,7 +145,7 @@ class ControlGUI:
             value=f"Update rate: {self.UPDATE_HZ} Hz   |   Delay: {self.UPDATE_MS} ms"
         )
 
-        #default values to insert
+        # default values to insert
         self.kp_value = IntVar(value=0)
         self.ki_value = IntVar(value=0)
         self.kd_value = IntVar(value=0)
@@ -156,11 +162,15 @@ class ControlGUI:
         self.recolor()
 
         self.window.update_idletasks()
-        self.window.minsize(self.window.winfo_reqwidth(),self.window.winfo_reqheight())
+        self.window.minsize(self.window.winfo_reqwidth(), self.window.winfo_reqheight())
 
+    def board_to_mm(self, board_index):
+        return board_index * self.MOTOR_SPACING_MM
 
+    def motor_to_mm(self, motor_index):
+        return motor_index * self.MOTOR_SPACING_MM
 
-    #The left panel is controlling the function relevant data
+    # The left panel is controlling the function relevant data
     def build_left_panel(self):
         panel = Frame(self.main_area)
         panel.pack(side=LEFT, anchor="n", padx=10, pady=10)
@@ -168,7 +178,14 @@ class ControlGUI:
         func_box = LabelFrame(panel, text="Function")
         func_box.pack(fill="x")
 
-        options = [("Min", self.MIN),("Zero", self.ZERO),("Max", self.MAX),("Wave in X", self.WAVE_X),("Wave in Y", self.WAVE_Y),("Wave X * Wave Y", self.WAVE_XY),]
+        options = [
+            ("Min", self.MIN),
+            ("Zero", self.ZERO),
+            ("Max", self.MAX),
+            ("Wave in X", self.WAVE_X),
+            ("Wave in Y", self.WAVE_Y),
+            ("Wave X * Wave Y", self.WAVE_XY),
+        ]
 
         for text, value in options:
             Radiobutton(func_box,text=text,variable=self.choice,value=value,command=self.refresh_motion_labels).pack(anchor="w")
@@ -179,27 +196,38 @@ class ControlGUI:
         Label(motion_box, textvariable=self.update_info_label_var).pack(anchor="w", padx=6, pady=(4, 8))
 
         Label(motion_box, text="fx (Hz)").pack(anchor="w", padx=6)
-        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fx,length=240,
-            command=lambda _=None: self.refresh_motion_labels()).pack()
+        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fx,length=240,command=lambda _=None: self.refresh_motion_labels()).pack()
 
         Label(motion_box, text="fy (Hz)").pack(anchor="w", padx=6)
-        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fy,length=240,
-            command=lambda _=None: self.refresh_motion_labels()).pack()
+        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fy,length=240,command=lambda _=None: self.refresh_motion_labels()).pack()
 
-        Label(motion_box, text="λx (boards)").pack(anchor="w", padx=6)
-        Spinbox(motion_box,from_=1.0,to=max(1.0, float(self.board_count)),increment=0.5,textvariable=self.lambda_x,width=8,
+        max_lambda_x_mm = max(self.MOTOR_SPACING_MM, self.board_count * self.MOTOR_SPACING_MM)
+        max_lambda_y_mm = max(self.MOTOR_SPACING_MM, self.motors_per_board * self.MOTOR_SPACING_MM)
+
+        Label(motion_box, text="λx (mm)").pack(anchor="w", padx=6)
+        Spinbox(motion_box,from_=self.MOTOR_SPACING_MM,to=max_lambda_x_mm,increment=5.0,textvariable=self.lambda_x,width=10,
             command=self.refresh_motion_labels).pack(anchor="w", padx=6, pady=(0, 6))
 
-        Label(motion_box, text="λy (motors)").pack(anchor="w", padx=6)
-        Spinbox(motion_box,from_=1.0,to=max(1.0, float(self.motors_per_board)),increment=0.5,textvariable=self.lambda_y,width=8,
+        Label(motion_box, text="λy (mm)").pack(anchor="w", padx=6)
+        Spinbox(motion_box,from_=self.MOTOR_SPACING_MM,to=max_lambda_y_mm,increment=5.0,textvariable=self.lambda_y,width=10,
             command=self.refresh_motion_labels).pack(anchor="w", padx=6, pady=(0, 6))
 
         info_box = LabelFrame(panel, text="Physics view")
         info_box.pack(fill="x", pady=8)
 
-        Label(info_box,textvariable=self.function_label_var,justify="left",wraplength=260).pack(anchor="w", padx=6, pady=(4, 6))
+        Label(
+            info_box,
+            textvariable=self.function_label_var,
+            justify="left",
+            wraplength=260
+        ).pack(anchor="w", padx=6, pady=(4, 6))
 
-        Label(info_box,textvariable=self.speed_label_var,justify="left",wraplength=260).pack(anchor="w", padx=6, pady=(0, 6))
+        Label(
+            info_box,
+            textvariable=self.speed_label_var,
+            justify="left",
+            wraplength=260
+        ).pack(anchor="w", padx=6, pady=(0, 6))
 
         run_box = LabelFrame(panel, text="Run")
         run_box.pack(fill="x", pady=8)
@@ -214,12 +242,31 @@ class ControlGUI:
 
         canvas_size = max(16, ceil(min(620 / self.motors_per_board, 1200 / self.board_count)))
 
+        # top-left empty corner
+        Label(board_frame, text="", width=4).grid(row=0, column=0, padx=1, pady=1)
+
+        # column numbers
+        for board in range(self.board_count):
+            Label(board_frame, text=str(board + 1), width=4).grid(
+                row=0, column=board + 1, padx=1, pady=1
+            )
+
+        # row numbers + motor cells
         for motor in range(self.motors_per_board):
+            Label(board_frame, text=str(motor + 1), width=4).grid(
+                row=motor + 1, column=0, padx=1, pady=1
+            )
+
             for board in range(self.board_count):
-                c = Canvas(board_frame,width=canvas_size,height=canvas_size,bg="green",highlightthickness=1,
+                c = Canvas(
+                    board_frame,
+                    width=canvas_size,
+                    height=canvas_size,
+                    bg="green",
+                    highlightthickness=1,
                     highlightbackground="white"
                 )
-                c.grid(row=motor, column=board, padx=0, pady=0)
+                c.grid(row=motor + 1, column=board + 1, padx=0, pady=0)
                 self.motor_canvases.append(c)
 
     def build_bottom_bar(self):
@@ -247,35 +294,39 @@ class ControlGUI:
         block.pack(side=LEFT, padx=8)
 
         Label(block, text=title).pack()
-        Scale(block,from_=0,to=255,orient="horizontal",variable=variable,length=170).pack()
+        Scale(block, from_=0, to=255, orient="horizontal", variable=variable, length=170).pack()
 
     def get_wave_function(self):
         fx = max(0.0, self.fx.get())
         fy = max(0.0, self.fy.get())
-        lambda_x = max(0.001, self.lambda_x.get())
-        lambda_y = max(0.001, self.lambda_y.get())
+        lambda_x_mm = max(0.001, self.lambda_x.get())
+        lambda_y_mm = max(0.001, self.lambda_y.get())
         mode = self.choice.get()
 
         if mode == self.MIN:
-            return lambda x, y, t: -1.0
+            return lambda board, motor, t: -1.0
         if mode == self.ZERO:
-            return lambda x, y, t: 0.0
+            return lambda board, motor, t: 0.0
         if mode == self.MAX:
-            return lambda x, y, t: 1.0
+            return lambda board, motor, t: 1.0
         if mode == self.WAVE_X:
-            return lambda x, y, t: sin(2 * pi * ((x / lambda_x) - fx * t))
+            return lambda board, motor, t: sin(
+                2 * pi * ((self.board_to_mm(board) / lambda_x_mm) - fx * t)
+            )
         if mode == self.WAVE_Y:
-            return lambda x, y, t: sin(2 * pi * ((y / lambda_y) - fy * t))
-        return lambda x, y, t: (
-            sin(2 * pi * ((x / lambda_x) - fx * t)) *
-            sin(2 * pi * ((y / lambda_y) - fy * t))
+            return lambda board, motor, t: sin(
+                2 * pi * ((self.motor_to_mm(motor) / lambda_y_mm) - fy * t)
+            )
+        return lambda board, motor, t: (
+            sin(2 * pi * ((self.board_to_mm(board) / lambda_x_mm) - fx * t)) *
+            sin(2 * pi * ((self.motor_to_mm(motor) / lambda_y_mm) - fy * t))
         )
 
     def refresh_motion_labels(self):
         fx = max(0.0, self.fx.get())
         fy = max(0.0, self.fy.get())
-        lambda_x = max(0.001, self.lambda_x.get())
-        lambda_y = max(0.001, self.lambda_y.get())
+        lambda_x_mm = max(0.001, self.lambda_x.get())
+        lambda_y_mm = max(0.001, self.lambda_y.get())
         mode = self.choice.get()
 
         if mode == self.MIN:
@@ -290,29 +341,30 @@ class ControlGUI:
         elif mode == self.WAVE_X:
             self.function_label_var.set(
                 f"Function:\nu(x,t) = sin(2π(x/λx - fx·t))\n"
-                f"λx = {lambda_x:.2f} boards,   fx = {fx:.2f} Hz"
+                f"λx = {lambda_x_mm:.2f} mm,   fx = {fx:.2f} Hz"
             )
             self.speed_label_var.set(
-                f"Derived speed:\nvx = fx·λx = {fx:.2f} · {lambda_x:.2f} = {fx * lambda_x:.2f} boards/s"
+                f"Derived speed:\nvx = fx·λx = {fx:.2f} · {lambda_x_mm:.2f} = {fx * lambda_x_mm:.2f} mm/s"
             )
         elif mode == self.WAVE_Y:
             self.function_label_var.set(
                 f"Function:\nu(y,t) = sin(2π(y/λy - fy·t))\n"
-                f"λy = {lambda_y:.2f} motors,   fy = {fy:.2f} Hz"
+                f"λy = {lambda_y_mm:.2f} mm,   fy = {fy:.2f} Hz"
             )
             self.speed_label_var.set(
-                f"Derived speed:\nvy = fy·λy = {fy:.2f} · {lambda_y:.2f} = {fy * lambda_y:.2f} motors/s"
+                f"Derived speed:\nvy = fy·λy = {fy:.2f} · {lambda_y_mm:.2f} = {fy * lambda_y_mm:.2f} mm/s"
             )
         else:
             self.function_label_var.set(
                 "Function:\n"
                 "u(x,y,t) = sin(2π(x/λx - fx·t)) · sin(2π(y/λy - fy·t))\n"
-                f"λx = {lambda_x:.2f}, fx = {fx:.2f} Hz, λy = {lambda_y:.2f}, fy = {fy:.2f} Hz"
+                f"λx = {lambda_x_mm:.2f} mm, fx = {fx:.2f} Hz, "
+                f"λy = {lambda_y_mm:.2f} mm, fy = {fy:.2f} Hz"
             )
             self.speed_label_var.set(
                 f"Derived speeds:\n"
-                f"vx = {fx * lambda_x:.2f} boards/s\n"
-                f"vy = {fy * lambda_y:.2f} motors/s"
+                f"vx = {fx * lambda_x_mm:.2f} mm/s\n"
+                f"vy = {fy * lambda_y_mm:.2f} mm/s"
             )
 
     def recolor(self):
