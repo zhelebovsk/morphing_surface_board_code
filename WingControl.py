@@ -1,22 +1,19 @@
-import time
 import can
 import os
 from tkinter import (
-    Tk, Frame, Canvas, Button, LEFT, RIGHT, LabelFrame,
+    Tk, Toplevel, Frame, Canvas, Button, LEFT, RIGHT, BOTTOM, X, LabelFrame,
     Radiobutton, IntVar, Entry, messagebox, Label,
-    Spinbox, BooleanVar, StringVar, OptionMenu
+    Spinbox, BooleanVar, StringVar, OptionMenu, Scale, Checkbutton
 )
 from math import sin, pi, ceil
 
 
 class WingControl:
-    # moved real state into __init__
-
     def __init__(self, range_of_motion, x_size, y_size, offset=0):
         self.zero = range_of_motion / 2
         self.locations = []
-        self.x_size = x_size   # x = board index
-        self.y_size = y_size   # y = motor index inside board
+        self.x_size = x_size   # board index
+        self.y_size = y_size   # motor index inside board
         self.offset = offset
 
         for x in range(x_size):
@@ -28,21 +25,17 @@ class WingControl:
                 self.locations[x][y] = self.zero + self.offset
 
     def assembleFunction(self, xy_func, x_increment, y_increment, x_start=0, y_start=0):
-        # locations[x][y] : x = board , y = motor inboard
         for x in range(self.x_size):
             for y in range(self.y_size):
                 raw_func_value = xy_func(
                     x_start + (x * x_increment),
                     y_start + (y * y_increment)
                 )
-
                 scaled_value = raw_func_value * self.zero + self.zero + self.offset
                 self.locations[x][y] = scaled_value
 
 
 class MotorCommunication:
-    # port now means CAN channel
-
     def __init__(self, port):
         self.bus = None
         self.demo = (port == "DEMO-MODE")
@@ -55,16 +48,18 @@ class MotorCommunication:
                 self.demo = True
 
     def send_frame(self, data, board_id):
-        # arbitration_id = board_id + 0x100
-        if(self.demo):
-            pass
-        else:
-            msg = can.Message(arbitration_id=board_id + 0x100,data=data,is_extended_id=False)
-            self.bus.send(msg, timeout=0.1)
+        if self.demo:
+            print(f"DEMO -> board {board_id}: {list(data)}")
+            return
+
+        msg = can.Message(
+            arbitration_id=board_id + 0x100,
+            data=data,
+            is_extended_id=False
+        )
+        self.bus.send(msg, timeout=0.1)
 
     def send(self, locations):
-        # one board = one x-column in locations
-        # locations[board][motor]
         board_count = len(locations)
         motors_per_board = len(locations[0])
 
@@ -75,34 +70,34 @@ class MotorCommunication:
         for board_index in range(board_count):
             board_id = board_index + 1
 
-            # first packet: mission 5 + motors 0..6
             data1 = bytes(
-                [14] +
+                [1] +
                 [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7)]
             )
 
-            # second packet: mission 6 + motors 7..13
             data2 = bytes(
-                [15] +
+                [2] +
                 [max(0, min(255, int(locations[board_index][motor]))) for motor in range(7, 14)]
             )
 
-            if self.bus != "DEMO":
-                # send data2 first, then data1
-                self.send_frame(data2, board_id)
-                self.send_frame(data1, board_id)
-            else:
-                raw1 = [locations[board_index][motor] for motor in range(7)]
-                raw2 = [locations[board_index][motor] for motor in range(7, 14)]
-                #old prints for checks
-                #print("BOARD", board_id, "RAW1", raw1)
-                #print("BOARD", board_id, "RAW2", raw2)
-                #print("ID:", hex(board_id + 0x100), "DATA:", data2.hex())
-                #print("ID:", hex(board_id + 0x100), "DATA:", data1.hex())
+            self.send_frame(data2, board_id)
+            self.send_frame(data1, board_id)
+
+    def send_board_config(self, board_id, kp, ki, kd, alpha, limit_signal, deadband):
+        data = bytes([
+            3,
+            max(0, min(255, int(kp))),
+            max(0, min(255, int(ki))),
+            max(0, min(255, int(kd))),
+            max(0, min(255, int(alpha))),
+            max(0, min(255, int(limit_signal))),
+            max(0, min(255, int(deadband))),
+            0
+        ])
+        self.send_frame(data, board_id)
 
 
 class ControlGUI:
-    # Constants for function choice
     MIN = 0
     ZERO = 1
     MAX = 2
@@ -112,186 +107,279 @@ class ControlGUI:
     CUSTOM = 6
 
     def __init__(self, port, range_of_motion, width=14, length=30, offset=0):
-        # width = 14 motors per board
-        # length = 30 boards
-        # WingControl stores locations[board][motor]
         self.wing_control = WingControl(range_of_motion, length, width, offset)
         self.communication = MotorCommunication(port)
+        self.board_count = length
 
         self.window = Tk()
         self.window.title("Motor Control")
-        self.window.geometry("1136x612")
-        self.window.resizable(False, False)
+        self.window.geometry("1600x850")
+        self.window.resizable(True, True)
+
+        self.main_area = Frame(self.window)
+        self.main_area.pack(side="top", fill="both", expand=True)
+
+        self.bottom_area = Frame(self.window)
+        self.bottom_area.pack(side="bottom", fill="x")
 
         self.motor_representation = []
         self.dynamic_on = []
         self.dynamic_off = []
         self.choice = IntVar(value=self.ZERO)
-        self.dynamically_running = BooleanVar()
+        self.dynamically_running = BooleanVar(value=False)
+
+        self.kp_value = IntVar(value=0)
+        self.ki_value = IntVar(value=0)
+        self.kd_value = IntVar(value=0)
+        self.alpha_value = IntVar(value=0)
+        self.limit_signal_value = IntVar(value=0)
+        self.deadband_value = IntVar(value=0)
 
         self.control_panel_setup()
         self.visual_motor_setup(width, length)
+        self.bottom_bar_setup()
+
+        self.window.update_idletasks()
+        self.window.minsize(
+            self.window.winfo_reqwidth(),
+            self.window.winfo_reqheight()
+        )
 
     def control_panel_setup(self):
-        control_panel = Frame(self.window, name="control_panel")
-        control_panel.pack(side=LEFT)
+        control_panel = Frame(self.main_area)
+        control_panel.pack(side=LEFT, anchor="n", padx=8, pady=8)
 
-        func_options = LabelFrame(control_panel, text="function options", name="func_options")
-        func_options.pack()
+        func_options = LabelFrame(control_panel, text="function options")
+        func_options.pack(fill="x")
 
-        function_options = []
+        function_options = [
+            ("min", self.MIN),
+            ("zero", self.ZERO),
+            ("max", self.MAX),
+            ("sin x", self.SIN_X),
+            ("sin y", self.SIN_Y),
+            ("sin x * sin y", self.SIN_X_SIN_Y),
+            ("custom", self.CUSTOM),
+        ]
 
-        function_options.append(Radiobutton(func_options, text="min", variable=self.choice, value=self.MIN))
-        function_options.append(Radiobutton(func_options, text="zero", variable=self.choice, value=self.ZERO))
-        function_options.append(Radiobutton(func_options, text="max", variable=self.choice, value=self.MAX))
-        function_options.append(Radiobutton(func_options, text="sin x", variable=self.choice, value=self.SIN_X))
-        function_options.append(Radiobutton(func_options, text="sin y", variable=self.choice, value=self.SIN_Y))
-        function_options.append(Radiobutton(func_options, text="sin x * sin y", variable=self.choice, value=self.SIN_X_SIN_Y))
-        function_options.append(Radiobutton(func_options, text="custom", variable=self.choice, value=self.CUSTOM))
+        for text, value in function_options:
+            Radiobutton(func_options, text=text, variable=self.choice, value=value).pack(anchor="w")
 
-        for radio_button in function_options:
-            radio_button.pack()
+        self.custom_entry = Entry(func_options)
+        self.custom_entry.pack(fill="x")
+        self.dynamic_off.append(self.custom_entry)
 
-        custom = Entry(func_options, name="custom")
-        custom.pack()
-        self.dynamic_off.append(custom)
+        run_options = LabelFrame(control_panel, text="run options")
+        run_options.pack(fill="x", pady=6)
 
-        run_options = LabelFrame(control_panel, text="run options", name="run_options")
-        run_options.pack()
-
-        static_btn = Button(run_options, text="run statically", command=lambda: self.runStatic())
-        static_btn.pack()
+        static_btn = Button(run_options, text="run statically", command=self.runStatic)
+        static_btn.pack(fill="x")
         self.dynamic_off.append(static_btn)
 
-        self.dynamically_running = BooleanVar()
+        Label(run_options, text="delay(ms):").pack()
+
+        self.delay_val = Spinbox(run_options, from_=5, to=20000, increment=5)
+        self.delay_val.pack(fill="x")
 
         dynamic_start_btn = Button(
             run_options,
             text="start running dynamically",
-            command=lambda: self.startDynamic(int(delay_val.get()))
+            command=lambda: self.startDynamic(int(self.delay_val.get()))
         )
-        dynamic_start_btn.pack()
+        dynamic_start_btn.pack(fill="x")
         self.dynamic_off.append(dynamic_start_btn)
 
         dynamic_stop_btn = Button(
             run_options,
             text="stop running dynamically",
             state="disabled",
-            command=lambda: self.stopDynamic()
+            command=self.stopDynamic
         )
-        dynamic_stop_btn.pack()
+        dynamic_stop_btn.pack(fill="x")
         self.dynamic_on.append(dynamic_stop_btn)
 
-        delay_lbl = Label(run_options, text="delay(ms):")
-        delay_lbl.pack()
+        advanced_options = LabelFrame(control_panel, text="advanced options")
+        advanced_options.pack(fill="x", pady=6)
 
-        delay_val = Spinbox(run_options, from_=5, to=20000, increment=5, name="delay_val")
-        delay_val.pack()
+        motor_increment_options = LabelFrame(advanced_options, text="motor increments")
+        motor_increment_options.pack(fill="x")
 
-        advanced_options = LabelFrame(control_panel, text="advanced options", name="advanced_options")
-        advanced_options.pack()
+        Label(motor_increment_options, text="x axis:").pack()
+        self.x_motor_increment = Entry(motor_increment_options)
+        self.x_motor_increment.insert(0, "pi/12")
+        self.x_motor_increment.pack(fill="x")
 
-        motor_increment_options = LabelFrame(
-            advanced_options,
-            text="motor increments",
-            name="motor_increment_options"
-        )
-        motor_increment_options.pack()
+        Label(motor_increment_options, text="y axis:").pack()
+        self.y_motor_increment = Entry(motor_increment_options)
+        self.y_motor_increment.insert(0, "pi/12")
+        self.y_motor_increment.pack(fill="x")
 
-        x_motor_lbl = Label(motor_increment_options, text="x axis:")
-        x_motor_lbl.pack()
-        x_motor_increment = Entry(motor_increment_options, name="x_motor_increment")
-        x_motor_increment.insert(0, "pi/12")
-        x_motor_increment.pack()
+        time_increment_options = LabelFrame(advanced_options, text="time increments")
+        time_increment_options.pack(fill="x", pady=6)
 
-        y_motor_lbl = Label(motor_increment_options, text="y axis:")
-        y_motor_lbl.pack()
-        y_motor_increment = Entry(motor_increment_options, name="y_motor_increment")
-        y_motor_increment.insert(0, "pi/12")
-        y_motor_increment.pack()
+        Label(time_increment_options, text="x axis:").pack()
+        self.x_time_increment = Entry(time_increment_options)
+        self.x_time_increment.insert(0, "pi/12")
+        self.x_time_increment.pack(fill="x")
 
-        time_increment_options = LabelFrame(
-            advanced_options,
-            text="time increments",
-            name="time_increment_options"
-        )
-        time_increment_options.pack()
-
-        x_time_lbl = Label(time_increment_options, text="x axis:")
-        x_time_lbl.pack()
-        x_time_increment = Entry(time_increment_options, name="x_time_increment")
-        x_time_increment.insert(0, "pi/12")
-        x_time_increment.pack()
-
-        y_time_lbl = Label(time_increment_options, text="y axis:")
-        y_time_lbl.pack()
-        y_time_increment = Entry(time_increment_options, name="y_time_increment")
-        y_time_increment.insert(0, "pi/12")
-        y_time_increment.pack()
+        Label(time_increment_options, text="y axis:").pack()
+        self.y_time_increment = Entry(time_increment_options)
+        self.y_time_increment.insert(0, "pi/12")
+        self.y_time_increment.pack(fill="x")
 
     def visual_motor_setup(self, width, length):
-        # visual layout draws width rows and length columns.
-        # Since one board is one column, that matches the GUI meaning.
-        visual_motors = Frame(self.window)
-        visual_motors.pack(side=RIGHT)
+        visual_motors = Frame(self.main_area)
+        visual_motors.pack(side=RIGHT, padx=8, pady=8, expand=True)
 
-        counter = 0
-        canvas_size = ceil(min((375 / width), (750 / length)))
+        canvas_size = max(14, ceil(min(560 / width, 1120 / length)))
 
-        for yCount in range(width):
-            for xCount in range(length):
-                self.motor_representation.append(
-                    Canvas(visual_motors, height=canvas_size, width=canvas_size, bg="green")
+        for y_count in range(width):
+            for x_count in range(length):
+                canvas = Canvas(
+                    visual_motors,
+                    height=canvas_size,
+                    width=canvas_size,
+                    bg="green",
+                    highlightthickness=1,
+                    highlightbackground="white"
                 )
-                self.motor_representation[counter].grid(
-                    row=yCount, column=xCount, padx=0, pady=0, ipadx=0, ipady=0
-                )
-                counter += 1
+                canvas.grid(row=y_count, column=x_count, padx=0, pady=0, ipadx=0, ipady=0)
+                self.motor_representation.append(canvas)
+
+    def add_slider(self, parent, title, variable):
+        slider_frame = Frame(parent)
+        slider_frame.pack(side=LEFT, padx=10, pady=5)
+
+        Label(slider_frame, text=title).pack()
+        Scale(
+            slider_frame,
+            from_=0,
+            to=255,
+            orient="horizontal",
+            variable=variable,
+            length=180
+        ).pack()
+
+    def bottom_bar_setup(self):
+        bottom_bar = LabelFrame(self.bottom_area, text="Board config")
+        bottom_bar.pack(fill=X, padx=8, pady=8)
+
+        sliders_frame = Frame(bottom_bar)
+        sliders_frame.pack(side=LEFT, padx=10, pady=5)
+
+        self.add_slider(sliders_frame, "Kp", self.kp_value)
+        self.add_slider(sliders_frame, "Ki", self.ki_value)
+        self.add_slider(sliders_frame, "Kd", self.kd_value)
+        self.add_slider(sliders_frame, "Alpha", self.alpha_value)
+        self.add_slider(sliders_frame, "Limit signal", self.limit_signal_value)
+        self.add_slider(sliders_frame, "Deadband", self.deadband_value)
+
+        buttons_frame = Frame(bottom_bar)
+        buttons_frame.pack(side=LEFT, padx=15, pady=5)
+
+        Button(
+            buttons_frame,
+            text="Send to all boards",
+            command=self.send_config_to_all_boards
+        ).pack(fill=X, pady=2)
+
+        Button(
+            buttons_frame,
+            text="Pick boards",
+            command=self.open_pick_boards_window
+        ).pack(fill=X, pady=2)
+
+    def build_config_values(self):
+        return (
+            self.kp_value.get(),
+            self.ki_value.get(),
+            self.kd_value.get(),
+            self.alpha_value.get(),
+            self.limit_signal_value.get(),
+            self.deadband_value.get()
+        )
+
+    def send_config_to_all_boards(self):
+        kp, ki, kd, alpha, limit_signal, deadband = self.build_config_values()
+
+        for board_id in range(1, self.board_count + 1):
+            self.communication.send_board_config(
+                board_id, kp, ki, kd, alpha, limit_signal, deadband
+            )
+
+    def open_pick_boards_window(self):
+        pick_window = Toplevel(self.window)
+        pick_window.title("Pick boards")
+        pick_window.resizable(False, False)
+
+        checks_frame = Frame(pick_window)
+        checks_frame.pack(padx=10, pady=10)
+
+        board_vars = []
+
+        for board_index in range(self.board_count):
+            var = BooleanVar(value=False)
+            board_vars.append(var)
+
+            Checkbutton(
+                checks_frame,
+                text=f"Board {board_index + 1}",
+                variable=var
+            ).grid(row=board_index // 4, column=board_index % 4, sticky="w", padx=8, pady=3)
+
+        def send_selected():
+            kp, ki, kd, alpha, limit_signal, deadband = self.build_config_values()
+
+            for board_index, var in enumerate(board_vars):
+                if var.get():
+                    self.communication.send_board_config(
+                        board_index + 1,
+                        kp, ki, kd, alpha, limit_signal, deadband
+                    )
+
+            pick_window.destroy()
+
+        buttons_frame = Frame(pick_window)
+        buttons_frame.pack(pady=(0, 10))
+
+        Button(buttons_frame, text="Send", command=send_selected).pack(side=LEFT, padx=5)
+        Button(buttons_frame, text="Cancel", command=pick_window.destroy).pack(side=LEFT, padx=5)
 
     def functionParser(self):
         if self.choice.get() == self.MIN:
-            func = lambda x, y: -1
+            return lambda x, y: -1
         elif self.choice.get() == self.ZERO:
-            func = lambda x, y: 0
+            return lambda x, y: 0
         elif self.choice.get() == self.MAX:
-            func = lambda x, y: 1
+            return lambda x, y: 1
         elif self.choice.get() == self.SIN_X:
-            func = lambda x, y: sin(x)
+            return lambda x, y: sin(x)
         elif self.choice.get() == self.SIN_Y:
-            func = lambda x, y: sin(y)
+            return lambda x, y: sin(y)
         elif self.choice.get() == self.SIN_X_SIN_Y:
-            func = lambda x, y: sin(x) * sin(y)
+            return lambda x, y: sin(x) * sin(y)
         elif self.choice.get() == self.CUSTOM:
-            # still uses eval, this is not safe for untrusted input
-            func = lambda x, y: eval(
-                self.window.children.get("control_panel")
-                .children.get("func_options")
-                .children.get("custom").get()
-            )
+            return lambda x, y: eval(self.custom_entry.get())
         else:
             messagebox.showwarning(
                 "Function Choice Error",
                 "An error has occurred while trying to parse the radio box data.\n"
                 "Falling back to zero."
             )
-            func = lambda x, y: 0
-        return func
+            return lambda x, y: 0
 
     def recolor(self):
         counter = 0
         for y in range(self.wing_control.y_size):
             for x in range(self.wing_control.x_size):
-                # clamp to 0..255 so bad values don't break color generation
                 grayscale = round(
                     255 *
                     (self.wing_control.locations[x][y] - self.wing_control.offset)
                     / (self.wing_control.zero * 2)
                 )
                 grayscale = max(0, min(255, grayscale))
-                location_value_hex = hex(grayscale)[2:]
-                if len(location_value_hex) < 2:
-                    location_value_hex = "0" + location_value_hex
-                self.motor_representation[counter]["bg"] = "#" + location_value_hex * 3
+                value_hex = f"{grayscale:02x}"
+                self.motor_representation[counter]["bg"] = "#" + value_hex * 3
                 counter += 1
 
     def update(self):
@@ -302,12 +390,7 @@ class ControlGUI:
         func = self.functionParser()
 
         try:
-            x_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("motor_increment_options")
-                .children.get("x_motor_increment").get()
-            )
+            x_inc = eval(self.x_motor_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "x Motor Increment Error",
@@ -318,12 +401,7 @@ class ControlGUI:
             x_inc = pi / 12
 
         try:
-            y_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("motor_increment_options")
-                .children.get("y_motor_increment").get()
-            )
+            y_inc = eval(self.y_motor_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "y Motor Increment Error",
@@ -356,12 +434,7 @@ class ControlGUI:
         func = self.functionParser()
 
         try:
-            x_motor_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("motor_increment_options")
-                .children.get("x_motor_increment").get()
-            )
+            x_motor_inc = eval(self.x_motor_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "x Motor Increment Error",
@@ -372,12 +445,7 @@ class ControlGUI:
             x_motor_inc = pi / 12
 
         try:
-            y_motor_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("motor_increment_options")
-                .children.get("y_motor_increment").get()
-            )
+            y_motor_inc = eval(self.y_motor_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "y Motor Increment Error",
@@ -388,12 +456,7 @@ class ControlGUI:
             y_motor_inc = pi / 12
 
         try:
-            x_time_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("time_increment_options")
-                .children.get("x_time_increment").get()
-            )
+            x_time_inc = eval(self.x_time_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "x Time Increment Error",
@@ -404,12 +467,7 @@ class ControlGUI:
             x_time_inc = pi / 12
 
         try:
-            y_time_inc = eval(
-                self.window.children.get("control_panel")
-                .children.get("advanced_options")
-                .children.get("time_increment_options")
-                .children.get("y_time_increment").get()
-            )
+            y_time_inc = eval(self.y_time_increment.get())
         except Exception as exception:
             messagebox.showwarning(
                 "y Time Increment Error",
@@ -467,13 +525,15 @@ class ControlGUI:
 
 class SetupGUI:
     def __init__(self):
-        # demo is now just the first option, always present
-        # we can add more demo channels here if needed
         ports_list = ["DEMO-MODE"]
 
-        for name in os.listdir("/sys/class/net"):
-            if name.startswith("can") or name.startswith("vcan") or name.startswith("slcan"):
-                ports_list.append(name)
+        try:
+            for name in os.listdir("/sys/class/net"):
+                if name.startswith(("can", "vcan", "slcan")):
+                    ports_list.append(name)
+        except OSError:
+            pass
+
         self.setting_popup = Tk()
         self.setting_popup.title("gui setup")
         self.setting_popup.geometry("500x70")
@@ -482,47 +542,39 @@ class SetupGUI:
         self.com_choice = StringVar()
         self.width_choice = IntVar()
         self.length_choice = IntVar()
-        self.start = False
+        self.start_flag = False
 
         self.visuals(ports_list)
         self.setting_popup.mainloop()
 
     def visuals(self, port_list):
-        # label changed from Serial COM to CAN channel
-        com_label = Label(self.setting_popup, text="CAN channel: ")
-        com_label.pack(side=LEFT)
+        Label(self.setting_popup, text="CAN channel: ").pack(side=LEFT)
 
         self.com_choice.set(port_list[0])
-        com_options = OptionMenu(self.setting_popup, self.com_choice, *port_list)
-        com_options.pack(side=LEFT)
+        OptionMenu(self.setting_popup, self.com_choice, *port_list).pack(side=LEFT)
 
-        width_label = Label(self.setting_popup, text="Width: ")
-        width_label.pack(side=LEFT)
+        Label(self.setting_popup, text="Width: ").pack(side=LEFT)
         self.width_choice.set(14)
-        width_val = Spinbox(
+        Spinbox(
             self.setting_popup,
             from_=1, to=50, increment=1,
             textvariable=self.width_choice,
             width=3
-        )
-        width_val.pack(side=LEFT)
+        ).pack(side=LEFT)
 
-        length_label = Label(self.setting_popup, text="Length: ")
-        length_label.pack(side=LEFT)
+        Label(self.setting_popup, text="Length: ").pack(side=LEFT)
         self.length_choice.set(30)
-        length_val = Spinbox(
+        Spinbox(
             self.setting_popup,
             from_=1, to=82, increment=1,
             textvariable=self.length_choice,
             width=3
-        )
-        length_val.pack(side=LEFT)
+        ).pack(side=LEFT)
 
-        start_btn = Button(self.setting_popup, text="Start", command=lambda: self.start_btn_cmd())
-        start_btn.pack(side=LEFT)
+        Button(self.setting_popup, text="Start", command=self.start_btn_cmd).pack(side=LEFT)
 
     def start_btn_cmd(self):
-        self.start = True
+        self.start_flag = True
         self.setting_popup.destroy()
 
     def get(self):
@@ -532,15 +584,13 @@ class SetupGUI:
 if __name__ == "__main__":
     setup = SetupGUI()
 
-    if setup.start:
+    if setup.start_flag:
         port, width, length = setup.get()
 
-        # range_of_motion kept as example value.
-        # change it to real hardware range if needed.
         app = ControlGUI(
             port=port,
             range_of_motion=255,
-            width=int(width),   # should be 14
-            length=int(length)  # should be 30
+            width=int(width),
+            length=int(length)
         )
         app.start()
