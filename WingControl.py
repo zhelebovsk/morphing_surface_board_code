@@ -101,6 +101,7 @@ class ControlGUI:
     WAVE_X = 3
     WAVE_Y = 4
     WAVE_XY = 5
+    HOUSE_SPECIAL = 6
 
     UPDATE_HZ = 100
     UPDATE_DT = 1.0 / UPDATE_HZ
@@ -133,8 +134,8 @@ class ControlGUI:
         self.fx = DoubleVar(value=0.5)
         self.fy = DoubleVar(value=0.5)
 
-        default_lambda_x_mm = max(self.MOTOR_SPACING_MM, (self.board_count) * self.MOTOR_SPACING_MM)
-        default_lambda_y_mm = max(self.MOTOR_SPACING_MM, (self.motors_per_board) * self.MOTOR_SPACING_MM)
+        default_lambda_x_mm = max(self.MOTOR_SPACING_MM, self.board_count * self.MOTOR_SPACING_MM)
+        default_lambda_y_mm = max(self.MOTOR_SPACING_MM, self.motors_per_board * self.MOTOR_SPACING_MM)
 
         self.lambda_x = DoubleVar(value=default_lambda_x_mm)
         self.lambda_y = DoubleVar(value=default_lambda_y_mm)
@@ -185,10 +186,17 @@ class ControlGUI:
             ("Wave in X", self.WAVE_X),
             ("Wave in Y", self.WAVE_Y),
             ("Wave X * Wave Y", self.WAVE_XY),
+            ("House special", self.HOUSE_SPECIAL),
         ]
 
         for text, value in options:
-            Radiobutton(func_box,text=text,variable=self.choice,value=value,command=self.refresh_motion_labels).pack(anchor="w")
+            Radiobutton(
+                func_box,
+                text=text,
+                variable=self.choice,
+                value=value,
+                command=self.refresh_motion_labels
+            ).pack(anchor="w")
 
         motion_box = LabelFrame(panel, text="Motion parameters")
         motion_box.pack(fill="x", pady=8)
@@ -196,21 +204,53 @@ class ControlGUI:
         Label(motion_box, textvariable=self.update_info_label_var).pack(anchor="w", padx=6, pady=(4, 8))
 
         Label(motion_box, text="fx (Hz)").pack(anchor="w", padx=6)
-        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fx,length=240,command=lambda _=None: self.refresh_motion_labels()).pack()
+        Scale(
+            motion_box,
+            from_=0.0,
+            to=5.0,
+            resolution=0.05,
+            orient="horizontal",
+            variable=self.fx,
+            length=240,
+            command=lambda _=None: self.refresh_motion_labels()
+        ).pack()
 
         Label(motion_box, text="fy (Hz)").pack(anchor="w", padx=6)
-        Scale(motion_box,from_=0.0,to=5.0,resolution=0.05,orient="horizontal",variable=self.fy,length=240,command=lambda _=None: self.refresh_motion_labels()).pack()
+        Scale(
+            motion_box,
+            from_=0.0,
+            to=5.0,
+            resolution=0.05,
+            orient="horizontal",
+            variable=self.fy,
+            length=240,
+            command=lambda _=None: self.refresh_motion_labels()
+        ).pack()
 
         max_lambda_x_mm = max(self.MOTOR_SPACING_MM, self.board_count * self.MOTOR_SPACING_MM)
         max_lambda_y_mm = max(self.MOTOR_SPACING_MM, self.motors_per_board * self.MOTOR_SPACING_MM)
 
         Label(motion_box, text="λx (mm)").pack(anchor="w", padx=6)
-        Spinbox(motion_box,from_=self.MOTOR_SPACING_MM,to=max_lambda_x_mm,increment=5.0,textvariable=self.lambda_x,width=10,
-            command=self.refresh_motion_labels).pack(anchor="w", padx=6, pady=(0, 6))
+        Spinbox(
+            motion_box,
+            from_=self.MOTOR_SPACING_MM,
+            to=max_lambda_x_mm,
+            increment=5.0,
+            textvariable=self.lambda_x,
+            width=10,
+            command=self.refresh_motion_labels
+        ).pack(anchor="w", padx=6, pady=(0, 6))
 
         Label(motion_box, text="λy (mm)").pack(anchor="w", padx=6)
-        Spinbox(motion_box,from_=self.MOTOR_SPACING_MM,to=max_lambda_y_mm,increment=5.0,textvariable=self.lambda_y,width=10,
-            command=self.refresh_motion_labels).pack(anchor="w", padx=6, pady=(0, 6))
+        Spinbox(
+            motion_box,
+            from_=self.MOTOR_SPACING_MM,
+            to=max_lambda_y_mm,
+            increment=5.0,
+            textvariable=self.lambda_y,
+            width=10,
+            command=self.refresh_motion_labels
+        ).pack(anchor="w", padx=6, pady=(0, 6))
 
         info_box = LabelFrame(panel, text="Physics view")
         info_box.pack(fill="x", pady=8)
@@ -317,10 +357,17 @@ class ControlGUI:
             return lambda board, motor, t: sin(
                 2 * pi * ((self.motor_to_mm(motor) / lambda_y_mm) - fy * t)
             )
-        return lambda board, motor, t: (
-            sin(2 * pi * ((self.board_to_mm(board) / lambda_x_mm) - fx * t)) *
-            sin(2 * pi * ((self.motor_to_mm(motor) / lambda_y_mm) - fy * t))
-        )
+        if mode == self.WAVE_XY:
+            return lambda board, motor, t: (
+                sin(2 * pi * ((self.board_to_mm(board) / lambda_x_mm) - fx * t)) *
+                sin(2 * pi * ((self.motor_to_mm(motor) / lambda_y_mm) - fy * t))
+            )
+
+        #CUSTOM - here you make your custom function, as board is 'the x axis' and motor is 'the y axis'
+        if mode == self.HOUSE_SPECIAL:
+            return lambda board, motor, t: sin(board*motor*t)
+
+        return lambda board, motor, t: 0.0
 
     def refresh_motion_labels(self):
         fx = max(0.0, self.fx.get())
@@ -354,7 +401,7 @@ class ControlGUI:
             self.speed_label_var.set(
                 f"Derived speed:\nvy = fy·λy = {fy:.2f} · {lambda_y_mm:.2f} = {fy * lambda_y_mm:.2f} mm/s"
             )
-        else:
+        elif mode == self.WAVE_XY:
             self.function_label_var.set(
                 "Function:\n"
                 "u(x,y,t) = sin(2π(x/λx - fx·t)) · sin(2π(y/λy - fy·t))\n"
@@ -366,6 +413,12 @@ class ControlGUI:
                 f"vx = {fx * lambda_x_mm:.2f} mm/s\n"
                 f"vy = {fy * lambda_y_mm:.2f} mm/s"
             )
+        elif mode == self.HOUSE_SPECIAL:
+            self.function_label_var.set("Function:\nHouse special = 0\n(edit in code)")
+            self.speed_label_var.set("Speed:\nDefined by programmer")
+        else:
+            self.function_label_var.set("Function:\nu(x,y,t) = 0")
+            self.speed_label_var.set("Speed:\nStatic field")
 
     def recolor(self):
         counter = 0
