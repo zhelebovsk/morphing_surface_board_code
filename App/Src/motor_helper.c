@@ -4,6 +4,9 @@
 #define INIT_SAMPLES 1000
 #define DT 0.0005f
 
+#define HI_LIMIT 3415 // 2.5V DAC output
+#define LO_LIMIT 680 // 0.5V
+
 float Kp = 0.2f;
 float Ki = 0.1f;
 float Kd = 0.0f;
@@ -116,6 +119,13 @@ void update_potentiometer_values(void) {
 	pot_timer_us = get_time_us();
   fetch_potentiometer_values();
 	filter_potentiometer_values();
+}
+
+void start_potentiometer_limits(void) {
+  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, HI_LIMIT);
+  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, LO_LIMIT);
+  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+  HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 }
 
 void position_init() {

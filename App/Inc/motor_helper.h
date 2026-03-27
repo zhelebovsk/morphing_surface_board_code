@@ -3,6 +3,7 @@
 
 #include "stm32g4xx_hal.h"
 #include "adc.h"
+#include "dac.h"
 #include "board_config.h"
 #include <stdbool.h>
 #include "math.h"
@@ -17,6 +18,7 @@ void motor_pwm_timers_start(void);
 
 // void update_potentiometer_values(void);
 
+void start_potentiometer_limits(void);
 void position_init(void);
 void motor_location_set(uint8_t motor_id, uint16_t location); 
 void fix_motor_speeds();
