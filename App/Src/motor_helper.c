@@ -29,7 +29,8 @@ float pot_filtered[MOTOR_AMOUNT] = {0.0f};
 static uint32_t pot_timer_us = 0;
 static uint32_t pot_period_us = 500;
 
-uint16_t pot_zero = 1536;
+// uint16_t pot_zero = 1536;
+uint16_t pot_zero = 1048;
 
 float error[16];
 uint16_t desired_position[MOTOR_AMOUNT];

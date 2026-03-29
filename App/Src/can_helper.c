@@ -1,5 +1,7 @@
 #include "can_helper.h"
 
+#define LOCATION_MULTIPLIER 7
+
 
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len)
 {
@@ -36,12 +38,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     }
     if (data[0] == 0x1) { 
       for(int i = 0; i < 7; i++) {
-        motor_location_set(active_motors[i], data[i+1]*4); 
+        motor_location_set(active_motors[i], data[i+1]*LOCATION_MULTIPLIER); 
       }
     }
     if (data[0] == 0x2) { 
       for(int i = 0; i < 7; i++) {
-        motor_location_set(active_motors[i+7], data[i+1]*4); 
+        motor_location_set(active_motors[i+7], data[i+1]*LOCATION_MULTIPLIER); 
       }
     }
     if (data[0] == 0x3) { 
