@@ -7,6 +7,8 @@ from tkinter import (
 )
 from math import sin, pi, ceil
 
+SCALING_FACTOR = 2.5
+
 # calculates the locations of each motor in each wing
 class WingControl:
     def __init__(self, range_of_motion, board_count, motors_per_board, offset=0):
@@ -117,6 +119,7 @@ class ControlGUI:
         self.communication = MotorCommunication(channel)
 
         self.window = Tk()
+        self.window.tk.call('tk', 'scaling', SCALING_FACTOR)  # try 1.5–2.5
         self.window.title("Motor Control")
         self.window.geometry("1650x900")
         self.window.resizable(True, True)
@@ -532,8 +535,9 @@ class SetupGUI:
             pass
 
         self.window = Tk()
+        self.window.tk.call('tk', 'scaling', SCALING_FACTOR)  # try 1.5–2.5
         self.window.title("GUI setup")
-        self.window.geometry("520x80")
+        self.window.geometry("960x120")
         self.window.resizable(False, False)
 
         self.channel_choice = StringVar(value=channels[0])
