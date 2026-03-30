@@ -470,7 +470,11 @@ class ControlGUI:
             t = self.step_index * self.UPDATE_DT
             self.wing_control.fill_from_function(motor_function, t)
             locations = self.wing_control.locations
+            t0 = time.perf_counter()
             self.communication.send_positions(locations)
+            send_ms = (time.perf_counter() - t0) * 1000
+            if send_ms > self.UPDATE_DT * 1000:
+                print(f"\033[91mWARNING: send_positions took {send_ms:.1f} ms, exceeds cycle period {self.UPDATE_DT*1000:.1f} ms\033[0m")
             self._frame_queue.put([row[:] for row in locations])
             self.step_index += 1
 
