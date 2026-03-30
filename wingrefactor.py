@@ -23,9 +23,9 @@ MOTORS_PER_BOARD = 14
 MIN_LIMITS_FILE = "motor_min.csv"
 MAX_LIMITS_FILE = "motor_max.csv"
 
-
 def motor_function(x_mm, y_mm, t):
     return sin(t * 2 * pi + x_mm / 100) * cos(t * 2 * pi + y_mm / 100)
+    #return x_mm/300
 
 
 FUNCTION_DESCRIPTION = "u(x, y, t)"
