@@ -317,12 +317,13 @@ class ControlGUI:
         Scale(block, from_=0, to=255, orient="horizontal", variable=variable, length=170).pack()
 
     def recolor(self):
+        locations = self.wing_control.locations  # snapshot to avoid mid-loop replacement by send thread
         counter = 0
         for motor in range(self.wing_control.motors_per_board):
             for board in range(self.wing_control.board_count):
                 # normalise to -1 … +1
                 t = (
-                    (self.wing_control.locations[board][motor] - self.wing_control.offset)
+                    (locations[board][motor] - self.wing_control.offset)
                     / self.wing_control.zero
                 ) - 1.0
                 t = max(-1.0, min(1.0, t))
