@@ -1,5 +1,6 @@
 import can
 import os
+import csv
 import queue
 import threading
 import time
@@ -15,14 +16,72 @@ SCALING_FACTOR = 2.5
 MOTOR_SPACING_MM = 10.0   # mm per motor index (Y axis)
 BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
 
+BOARD_COUNT = 30
+MOTORS_PER_BOARD = 14
+
+MIN_LIMITS_FILE = "motor_min.csv"
+MAX_LIMITS_FILE = "motor_max.csv"
+
+
 def motor_function(x_mm, y_mm, t):
-    return sin(t*2*pi + x_mm/100) * cos(t*2*pi + y_mm/100)
+    return sin(t * 2 * pi + x_mm / 100) * cos(t * 2 * pi + y_mm / 100)
+
 
 FUNCTION_DESCRIPTION = "u(x, y, t)"
 
 
 def clamp8(x):
     return max(0, min(255, int(x)))
+
+
+def create_default_limit_file(path, default_value):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["board"] + [f"m{i}" for i in range(1, MOTORS_PER_BOARD + 1)])
+        for board in range(1, BOARD_COUNT + 1):
+            writer.writerow([board] + [default_value] * MOTORS_PER_BOARD)
+
+
+def load_limit_file(path, default_value):
+    if not os.path.exists(path):
+        create_default_limit_file(path, default_value)
+
+    limits = [[default_value for _ in range(MOTORS_PER_BOARD)] for _ in range(BOARD_COUNT)]
+
+    try:
+        with open(path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+
+        for board_index in range(min(BOARD_COUNT, len(rows) - 1)):
+            row = rows[board_index + 1]
+
+            for motor_index in range(MOTORS_PER_BOARD):
+                cell_index = motor_index + 1  # col 0 is board number
+                if cell_index < len(row):
+                    try:
+                        limits[board_index][motor_index] = clamp8(float(row[cell_index]))
+                    except ValueError:
+                        limits[board_index][motor_index] = default_value
+    except OSError:
+        pass
+
+    return limits
+
+
+def load_all_limits():
+    min_limits = load_limit_file(MIN_LIMITS_FILE, 0)
+    max_limits = load_limit_file(MAX_LIMITS_FILE, 255)
+
+    for board in range(BOARD_COUNT):
+        for motor in range(MOTORS_PER_BOARD):
+            if min_limits[board][motor] > max_limits[board][motor]:
+                min_limits[board][motor], max_limits[board][motor] = (
+                    max_limits[board][motor],
+                    min_limits[board][motor],
+                )
+
+    return min_limits, max_limits
 
 
 class WingControl:
@@ -39,7 +98,6 @@ class WingControl:
         self.y_center = (motors_per_board - 1) / 2
 
     def fill_from_function(self, func, t):
-        
         new_locations = []
         for board in range(self.board_count):
             x_mm = (board - self.x_center) * BOARD_SPACING_MM
@@ -49,13 +107,15 @@ class WingControl:
                 raw = func(x_mm, y_mm, t)
                 row.append(raw * self.zero + self.zero + self.offset)
             new_locations.append(row)
-        self.locations = new_locations  # single atomic assignment
+        self.locations = new_locations
 
 
 class MotorCommunication:
-    def __init__(self, channel):
+    def __init__(self, channel, min_limits, max_limits):
         self.bus = None
         self.demo = (channel == "DEMO-MODE")
+        self.min_limits = min_limits
+        self.max_limits = max_limits
 
         if not self.demo:
             try:
@@ -79,20 +139,31 @@ class MotorCommunication:
         except can.CanError as e:
             print(f"CAN send failed: {e}")
 
+    def scale_value(self, board_index, motor_index, destination):
+        motor_min = self.min_limits[board_index][motor_index]
+        motor_max = self.max_limits[board_index][motor_index]
+
+        mapped = motor_min + destination * (motor_max - motor_min) / 255.0
+        return clamp8(mapped)
+
     def send_positions(self, locations):
         board_count = len(locations)
         motors_per_board = len(locations[0])
+
+        if motors_per_board != 14:
+            print(f"ERROR: expected 14 motors per board, got {motors_per_board}")
+            return
 
         for board_index in range(board_count):
             board_id = board_index + 1
 
             data_low = bytes(
                 [1] +
-                [clamp8(locations[board_index][m]) for m in range(7)]
+                [self.scale_value(board_index, m, locations[board_index][m]) for m in range(7)]
             )
             data_high = bytes(
                 [2] +
-                [clamp8(locations[board_index][m]) for m in range(7, 14)]
+                [self.scale_value(board_index, m, locations[board_index][m]) for m in range(7, 14)]
             )
 
             self.send_frame(data_high, board_id)
@@ -116,13 +187,12 @@ class ControlGUI:
     UPDATE_HZ = 100.0
     UPDATE_DT = 1.0 / UPDATE_HZ
 
-    def __init__(self, channel, range_of_motion, width=14, length=30, offset=0):
-
+    def __init__(self, channel, min_limits, max_limits, range_of_motion, width=14, length=30):
         self.board_count = length
         self.motors_per_board = width
 
-        self.wing_control = WingControl(range_of_motion, length, width, offset)
-        self.communication = MotorCommunication(channel)
+        self.wing_control = WingControl(range_of_motion, length, width, offset=0)
+        self.communication = MotorCommunication(channel, min_limits, max_limits)
 
         self.window = Tk()
         self.window.tk.call('tk', 'scaling', SCALING_FACTOR)
@@ -197,8 +267,15 @@ class ControlGUI:
         t_row.pack(fill="x", padx=4, pady=2)
         Label(t_row, text="t =").pack(side=LEFT)
         self.static_t = DoubleVar(value=0.0)
-        Spinbox(t_row, from_=-1e9, to=1e9, increment=0.1, textvariable=self.static_t,
-                width=8, format="%.2f").pack(side=LEFT, padx=4)
+        Spinbox(
+            t_row,
+            from_=-1e9,
+            to=1e9,
+            increment=0.1,
+            textvariable=self.static_t,
+            width=8,
+            format="%.2f"
+        ).pack(side=LEFT, padx=4)
 
         Button(run_box, text="Run statically", command=self.run_static).pack(fill="x", padx=4, pady=2)
         Button(run_box, text="Start dynamic", command=self.start_dynamic).pack(fill="x", padx=4, pady=2)
@@ -226,13 +303,24 @@ class ControlGUI:
 
         headers = ["board", "motor", "x", "y", "z"]
         self._hover_vars = {h: StringVar(value="--") for h in headers}
-        units = {"x": " mm", "y": " mm"}
 
         for col, h in enumerate(headers):
-            Label(hover_frame, text=h, font=("Courier", 10, "bold"),
-                  width=12, relief="groove", anchor="center").grid(row=0, column=col, padx=1)
-            Label(hover_frame, textvariable=self._hover_vars[h],
-                  font=("Courier", 10), width=12, relief="sunken", anchor="center").grid(row=1, column=col, padx=1)
+            Label(
+                hover_frame,
+                text=h,
+                font=("Courier", 10, "bold"),
+                width=12,
+                relief="groove",
+                anchor="center"
+            ).grid(row=0, column=col, padx=1)
+            Label(
+                hover_frame,
+                textvariable=self._hover_vars[h],
+                font=("Courier", 10),
+                width=12,
+                relief="sunken",
+                anchor="center"
+            ).grid(row=1, column=col, padx=1)
 
         for motor in range(self.motors_per_board):
             pady = (10, 1) if motor == 7 else 1
@@ -265,11 +353,10 @@ class ControlGUI:
                 c.bind("<Leave>", lambda e: self._clear_hover_label())
 
         x_min = int(-self.wing_control.x_center * BOARD_SPACING_MM)
-        x_max = int( self.wing_control.x_center * BOARD_SPACING_MM)
+        x_max = int(self.wing_control.x_center * BOARD_SPACING_MM)
         y_min = int(-self.wing_control.y_center * MOTOR_SPACING_MM)
-        y_max = int( self.wing_control.y_center * MOTOR_SPACING_MM)
+        y_max = int(self.wing_control.y_center * MOTOR_SPACING_MM)
 
-        # bottom ruler
         Frame(board_frame, bg="black", height=2).grid(
             row=self.motors_per_board + 1, column=1,
             columnspan=self.board_count, sticky="ew", pady=(6, 0)
@@ -279,7 +366,6 @@ class ControlGUI:
             columnspan=self.board_count
         )
 
-        # right ruler
         Frame(board_frame, bg="black", width=2).grid(
             row=1, column=self.board_count + 1,
             rowspan=self.motors_per_board, sticky="ns", padx=(6, 0)
@@ -317,19 +403,18 @@ class ControlGUI:
         Scale(block, from_=0, to=255, orient="horizontal", variable=variable, length=170).pack()
 
     def recolor(self):
-        locations = self.wing_control.locations  # snapshot to avoid mid-loop replacement by send thread
+        locations = self.wing_control.locations
         counter = 0
         for motor in range(self.wing_control.motors_per_board):
             for board in range(self.wing_control.board_count):
-                # normalise to -1 … +1
                 t = (
                     (locations[board][motor] - self.wing_control.offset)
                     / self.wing_control.zero
                 ) - 1.0
                 t = max(-1.0, min(1.0, t))
-                if t >= 0:                      # 0 … +1  →  white … red
+                if t >= 0:
                     r, g, b = 255, round(255 * (1 - t)), round(255 * (1 - t))
-                else:                           # -1 … 0  →  blue … white
+                else:
                     r, g, b = round(255 * (1 + t)), round(255 * (1 + t)), 255
                 self.motor_canvases[counter]["bg"] = f"#{r:02x}{g:02x}{b:02x}"
                 counter += 1
@@ -484,14 +569,22 @@ class SetupGUI:
         self.window.destroy()
 
     def get(self):
-        return self.channel_choice.get()
+        min_limits, max_limits = load_all_limits()
+        return self.channel_choice.get(), min_limits, max_limits
 
 
 if __name__ == "__main__":
     setup = SetupGUI()
 
     if setup.started:
-        channel = setup.get()
+        channel, min_limits, max_limits = setup.get()
 
-        app = ControlGUI(channel=channel, range_of_motion=255)
+        app = ControlGUI(
+            channel=channel,
+            min_limits=min_limits,
+            max_limits=max_limits,
+            range_of_motion=255,
+            width=MOTORS_PER_BOARD,
+            length=BOARD_COUNT
+        )
         app.start()
