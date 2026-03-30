@@ -12,6 +12,7 @@ from tkinter import (
 from math import sin, cos, tan, pi, exp, sqrt, ceil
 
 SCALING_FACTOR = 2.5
+REFACTORING = False
 
 MOTOR_SPACING_MM = 10.0   # mm per motor index (Y axis)
 BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
@@ -140,6 +141,9 @@ class MotorCommunication:
             print(f"CAN send failed: {e}")
 
     def scale_value(self, board_index, motor_index, destination):
+        if not REFACTORING:
+            return clamp8(destination)
+
         motor_min = self.min_limits[board_index][motor_index]
         motor_max = self.max_limits[board_index][motor_index]
 
@@ -227,6 +231,14 @@ class ControlGUI:
 
         self.window.update_idletasks()
         self.window.minsize(self.window.winfo_reqwidth(), self.window.winfo_reqheight())
+
+    def displayed_value(self, board, motor):
+        raw_value = self.wing_control.locations[board][motor]
+
+        if not REFACTORING:
+            return clamp8(raw_value)
+
+        return self.communication.scale_value(board, motor, raw_value)
 
     def build_left_panel(self):
         panel = Frame(self.main_area)
@@ -403,29 +415,30 @@ class ControlGUI:
         Scale(block, from_=0, to=255, orient="horizontal", variable=variable, length=170).pack()
 
     def recolor(self):
-        locations = self.wing_control.locations
         counter = 0
         for motor in range(self.wing_control.motors_per_board):
             for board in range(self.wing_control.board_count):
-                t = (
-                    (locations[board][motor] - self.wing_control.offset)
-                    / self.wing_control.zero
-                ) - 1.0
+                shown_value = self.displayed_value(board, motor)
+                t = (shown_value / 255.0) * 2.0 - 1.0
                 t = max(-1.0, min(1.0, t))
+
                 if t >= 0:
                     r, g, b = 255, round(255 * (1 - t)), round(255 * (1 - t))
                 else:
                     r, g, b = round(255 * (1 + t)), round(255 * (1 + t)), 255
+
                 self.motor_canvases[counter]["bg"] = f"#{r:02x}{g:02x}{b:02x}"
                 counter += 1
+
         self._refresh_hover_label()
 
     def _refresh_hover_label(self):
         if self._hovered is None:
             return
         b, m, x, y = self._hovered
-        wc = self.wing_control
-        z = (wc.locations[b][m] - wc.offset) / wc.zero - 1.0
+        shown_value = self.displayed_value(b, m)
+        z = (shown_value / 255.0) * 2.0 - 1.0
+
         self._hover_vars["board"].set(str(b + 1))
         self._hover_vars["motor"].set(str(m + 1))
         self._hover_vars["x"].set(f"{x:+.1f} mm")
@@ -571,7 +584,6 @@ class SetupGUI:
     def get(self):
         min_limits, max_limits = load_all_limits()
         return self.channel_choice.get(), min_limits, max_limits
-
 
 if __name__ == "__main__":
     setup = SetupGUI()
