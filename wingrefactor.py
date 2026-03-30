@@ -1,5 +1,8 @@
 import can
 import os
+import queue
+import threading
+import time
 from tkinter import (
     Tk, Toplevel, Frame, Canvas, Button, LEFT, RIGHT, BOTTOM, X, LabelFrame,
     DoubleVar, BooleanVar, StringVar, IntVar, Label,
@@ -13,9 +16,13 @@ MOTOR_SPACING_MM = 10.0   # mm per motor index (Y axis)
 BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
 
 def motor_function(x_mm, y_mm, t):
-    return sin(2 * pi * (y_mm / 300 - 0.5 * t))
+    return sin(t*2*pi + x_mm/100) * cos(t*2*pi + y_mm/100)
 
-FUNCTION_DESCRIPTION = "u(x,t) = sin(2π(x/300mm − 0.5Hz·t))"
+FUNCTION_DESCRIPTION = "u(x, y, t)"
+
+
+def clamp8(x):
+    return max(0, min(255, int(x)))
 
 
 class WingControl:
@@ -28,15 +35,21 @@ class WingControl:
             [self.zero + offset for _ in range(motors_per_board)]
             for _ in range(board_count)
         ]
+        self.x_center = (board_count - 1) / 2
+        self.y_center = (motors_per_board - 1) / 2
 
     def fill_from_function(self, func, t):
+        
+        new_locations = []
         for board in range(self.board_count):
-            x_mm = board * BOARD_SPACING_MM
+            x_mm = (board - self.x_center) * BOARD_SPACING_MM
+            row = []
             for motor in range(self.motors_per_board):
-                y_mm = motor * MOTOR_SPACING_MM
+                y_mm = (self.y_center - motor) * MOTOR_SPACING_MM
                 raw = func(x_mm, y_mm, t)
-                scaled = raw * self.zero + self.zero + self.offset
-                self.locations[board][motor] = scaled
+                row.append(raw * self.zero + self.zero + self.offset)
+            new_locations.append(row)
+        self.locations = new_locations  # single atomic assignment
 
 
 class MotorCommunication:
@@ -61,26 +74,25 @@ class MotorCommunication:
             data=data,
             is_extended_id=False
         )
-        self.bus.send(msg, timeout=0.1)
+        try:
+            self.bus.send(msg, timeout=0.1)
+        except can.CanError as e:
+            print(f"CAN send failed: {e}")
 
     def send_positions(self, locations):
         board_count = len(locations)
         motors_per_board = len(locations[0])
-
-        if motors_per_board != 14:
-            print(f"ERROR: expected 14 motors per board, got {motors_per_board}")
-            return
 
         for board_index in range(board_count):
             board_id = board_index + 1
 
             data_low = bytes(
                 [1] +
-                [max(0, min(255, int(locations[board_index][m]))) for m in range(7)]
+                [clamp8(locations[board_index][m]) for m in range(7)]
             )
             data_high = bytes(
                 [2] +
-                [max(0, min(255, int(locations[board_index][m]))) for m in range(7, 14)]
+                [clamp8(locations[board_index][m]) for m in range(7, 14)]
             )
 
             self.send_frame(data_high, board_id)
@@ -89,21 +101,20 @@ class MotorCommunication:
     def send_board_config(self, board_id, kp, ki, kd, alpha, limit_signal, deadband):
         data = bytes([
             3,
-            max(0, min(255, int(kp))),
-            max(0, min(255, int(ki))),
-            max(0, min(255, int(kd))),
-            max(0, min(255, int(alpha))),
-            max(0, min(255, int(limit_signal))),
-            max(0, min(255, int(deadband))),
+            clamp8(kp),
+            clamp8(ki),
+            clamp8(kd),
+            clamp8(alpha),
+            clamp8(limit_signal),
+            clamp8(deadband),
             0
         ])
         self.send_frame(data, board_id)
 
 
 class ControlGUI:
-    UPDATE_HZ = 100
+    UPDATE_HZ = 100.0
     UPDATE_DT = 1.0 / UPDATE_HZ
-    UPDATE_MS = int(1000 / UPDATE_HZ)
 
     def __init__(self, channel, range_of_motion, width=14, length=30, offset=0):
 
@@ -125,8 +136,10 @@ class ControlGUI:
         self.bottom_area = Frame(self.window)
         self.bottom_area.pack(side=BOTTOM, fill=X)
 
-        self.running = BooleanVar(value=False)
+        self.running = False
         self.step_index = 0
+        self._hovered = None
+        self._frame_queue = queue.Queue()
 
         self.kp_value = IntVar(value=0)
         self.ki_value = IntVar(value=0)
@@ -173,14 +186,21 @@ class ControlGUI:
 
         Label(
             timing_box,
-            text=f"Update rate: {self.UPDATE_HZ} Hz\nDelay: {self.UPDATE_MS} ms",
+            text=f"Update rate: {self.UPDATE_HZ} Hz",
             justify="left"
         ).pack(anchor="w", padx=6, pady=6)
 
         run_box = LabelFrame(panel, text="Run")
         run_box.pack(fill="x", pady=8)
 
-        Button(run_box, text="Run statically (t=0)", command=self.run_static).pack(fill="x", padx=4, pady=2)
+        t_row = Frame(run_box)
+        t_row.pack(fill="x", padx=4, pady=2)
+        Label(t_row, text="t =").pack(side=LEFT)
+        self.static_t = DoubleVar(value=0.0)
+        Spinbox(t_row, from_=-1e9, to=1e9, increment=0.1, textvariable=self.static_t,
+                width=8, format="%.2f").pack(side=LEFT, padx=4)
+
+        Button(run_box, text="Run statically", command=self.run_static).pack(fill="x", padx=4, pady=2)
         Button(run_box, text="Start dynamic", command=self.start_dynamic).pack(fill="x", padx=4, pady=2)
         Button(run_box, text="Stop dynamic", command=self.stop_dynamic).pack(fill="x", padx=4, pady=2)
 
@@ -193,26 +213,81 @@ class ControlGUI:
         Label(board_frame, text="", width=4).grid(row=0, column=0, padx=1, pady=1)
 
         for board in range(self.board_count):
+            padx = (10, 1) if board == 15 else 1
             Label(board_frame, text=str(board + 1), width=4).grid(
-                row=0, column=board + 1, padx=1, pady=1
+                row=0, column=board + 1, padx=padx, pady=1
             )
 
+        hover_frame = Frame(board_frame)
+        hover_frame.grid(
+            row=self.motors_per_board + 3, column=0,
+            columnspan=self.board_count + 1, pady=(8, 0)
+        )
+
+        headers = ["board", "motor", "x", "y", "z"]
+        self._hover_vars = {h: StringVar(value="--") for h in headers}
+        units = {"x": " mm", "y": " mm"}
+
+        for col, h in enumerate(headers):
+            Label(hover_frame, text=h, font=("Courier", 10, "bold"),
+                  width=12, relief="groove", anchor="center").grid(row=0, column=col, padx=1)
+            Label(hover_frame, textvariable=self._hover_vars[h],
+                  font=("Courier", 10), width=12, relief="sunken", anchor="center").grid(row=1, column=col, padx=1)
+
         for motor in range(self.motors_per_board):
+            pady = (10, 1) if motor == 7 else 1
             Label(board_frame, text=str(motor + 1), width=4).grid(
-                row=motor + 1, column=0, padx=1, pady=1
+                row=motor + 1, column=0, padx=1, pady=pady
             )
 
             for board in range(self.board_count):
+                padx = (10, 0) if board == 15 else 0
+                pady = (10, 0) if motor == 7 else 0
                 c = Canvas(
                     board_frame,
                     width=canvas_size,
                     height=canvas_size,
                     bg="green",
                     highlightthickness=1,
-                    highlightbackground="white"
+                    highlightbackground="black"
                 )
-                c.grid(row=motor + 1, column=board + 1, padx=0, pady=0)
+                c.grid(row=motor + 1, column=board + 1, padx=padx, pady=pady)
                 self.motor_canvases.append(c)
+
+                x_mm = (board - self.wing_control.x_center) * BOARD_SPACING_MM
+                y_mm = (self.wing_control.y_center - motor) * MOTOR_SPACING_MM
+
+                def on_enter(e, b=board, m=motor, x=x_mm, y=y_mm):
+                    self._hovered = (b, m, x, y)
+                    self._refresh_hover_label()
+
+                c.bind("<Enter>", on_enter)
+                c.bind("<Leave>", lambda e: self._clear_hover_label())
+
+        x_min = int(-self.wing_control.x_center * BOARD_SPACING_MM)
+        x_max = int( self.wing_control.x_center * BOARD_SPACING_MM)
+        y_min = int(-self.wing_control.y_center * MOTOR_SPACING_MM)
+        y_max = int( self.wing_control.y_center * MOTOR_SPACING_MM)
+
+        # bottom ruler
+        Frame(board_frame, bg="black", height=2).grid(
+            row=self.motors_per_board + 1, column=1,
+            columnspan=self.board_count, sticky="ew", pady=(6, 0)
+        )
+        Label(board_frame, text=f"x:  {x_min} … {x_max} mm").grid(
+            row=self.motors_per_board + 2, column=1,
+            columnspan=self.board_count
+        )
+
+        # right ruler
+        Frame(board_frame, bg="black", width=2).grid(
+            row=1, column=self.board_count + 1,
+            rowspan=self.motors_per_board, sticky="ns", padx=(6, 0)
+        )
+        Label(board_frame, text=f"y: +{y_max}\n…\n{y_min} mm", justify="center").grid(
+            row=1, column=self.board_count + 2,
+            rowspan=self.motors_per_board
+        )
 
     def build_bottom_bar(self):
         bottom_bar = LabelFrame(self.bottom_area, text="Board config packet")
@@ -245,44 +320,82 @@ class ControlGUI:
         counter = 0
         for motor in range(self.wing_control.motors_per_board):
             for board in range(self.wing_control.board_count):
-                grayscale = round(
-                    255 *
+                # normalise to -1 … +1
+                t = (
                     (self.wing_control.locations[board][motor] - self.wing_control.offset)
-                    / (self.wing_control.zero * 2)
-                )
-                grayscale = max(0, min(255, grayscale))
-                hex_value = f"{grayscale:02x}"
-                self.motor_canvases[counter]["bg"] = "#" + hex_value * 3
+                    / self.wing_control.zero
+                ) - 1.0
+                t = max(-1.0, min(1.0, t))
+                if t >= 0:                      # 0 … +1  →  white … red
+                    r, g, b = 255, round(255 * (1 - t)), round(255 * (1 - t))
+                else:                           # -1 … 0  →  blue … white
+                    r, g, b = round(255 * (1 + t)), round(255 * (1 + t)), 255
+                self.motor_canvases[counter]["bg"] = f"#{r:02x}{g:02x}{b:02x}"
                 counter += 1
+        self._refresh_hover_label()
 
-    def push_positions(self):
+    def _refresh_hover_label(self):
+        if self._hovered is None:
+            return
+        b, m, x, y = self._hovered
+        wc = self.wing_control
+        z = (wc.locations[b][m] - wc.offset) / wc.zero - 1.0
+        self._hover_vars["board"].set(str(b + 1))
+        self._hover_vars["motor"].set(str(m + 1))
+        self._hover_vars["x"].set(f"{x:+.1f} mm")
+        self._hover_vars["y"].set(f"{y:+.1f} mm")
+        self._hover_vars["z"].set(f"{z:+.3f}")
+
+    def _clear_hover_label(self):
+        self._hovered = None
+        for v in self._hover_vars.values():
+            v.set("--")
+
+    def run_static(self):
+        self.wing_control.fill_from_function(motor_function, t=self.static_t.get())
         self.communication.send_positions(self.wing_control.locations)
         self.recolor()
 
-    def run_static(self):
-        self.wing_control.fill_from_function(motor_function, t=0.0)
-        self.push_positions()
-
     def start_dynamic(self):
-        if self.running.get():
+        if self.running:
             return
-        self.running.set(True)
+        self.running = True
         self.step_index = 0
-        self.run_dynamic_step()
+        self._frame_queue = queue.Queue()
+        threading.Thread(target=self._send_loop, daemon=True).start()
+        self._schedule_recolor()
 
-    def run_dynamic_step(self):
-        if not self.running.get():
+    def _send_loop(self):
+        next_time = time.perf_counter()
+        while self.running:
+            t = self.step_index * self.UPDATE_DT
+            self.wing_control.fill_from_function(motor_function, t)
+            locations = self.wing_control.locations
+            self.communication.send_positions(locations)
+            self._frame_queue.put([row[:] for row in locations])
+            self.step_index += 1
+
+            next_time = max(next_time + self.UPDATE_DT, time.perf_counter())
+            sleep_for = next_time - time.perf_counter()
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+
+    def _schedule_recolor(self):
+        if not self.running:
             return
-
-        t = self.step_index * self.UPDATE_DT
-        self.wing_control.fill_from_function(motor_function, t)
-        self.push_positions()
-
-        self.step_index += 1
-        self.window.after(self.UPDATE_MS, self.run_dynamic_step)
+        locations = None
+        try:
+            while True:
+                locations = self._frame_queue.get_nowait()
+        except queue.Empty:
+            pass
+        if locations is not None:
+            self.wing_control.locations = locations
+            self.recolor()
+        self.window.after(20, self._schedule_recolor)
 
     def stop_dynamic(self):
-        self.running.set(False)
+        self.running = False
 
     def build_config_values(self):
         return (
@@ -357,8 +470,6 @@ class SetupGUI:
         self.window.resizable(False, False)
 
         self.channel_choice = StringVar(value=channels[0])
-        self.width_choice = IntVar(value=14)
-        self.length_choice = IntVar(value=30)
         self.started = False
 
         Label(self.window, text="CAN channel:").pack(side=LEFT, padx=4, pady=8)
@@ -381,8 +492,5 @@ if __name__ == "__main__":
     if setup.started:
         channel = setup.get()
 
-        app = ControlGUI(
-            channel=channel,
-            range_of_motion=255
-        )
+        app = ControlGUI(channel=channel, range_of_motion=255)
         app.start()
