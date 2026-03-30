@@ -118,34 +118,29 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_FDCAN_Start(&hfdcan1);
   HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, ENABLE);
-  Start_ADC_DMA();
+  Calibrate_ADC();
   HAL_TIM_Base_Start(&htim2);
+  
+  start_potentiometer_limits();
   motor_power_setup(1);
   motor_pwm_timers_start();
 
-  current_time_us = get_time_us(); // Initialize global time variable
   board_id = Read_Board_ID(); // Initialize global board ID variable
   
-  // uint16_t pot_values[16] = {0};
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   position_init();
+  uint32_t last_call = 0;
   while (1) {
-    // usb_printf("t: %lu DIP ID: %u running... 
-    // CAN_Send(board_id, &counter2, FDCAN_DLC_BYTES_1);
-    // CAN_Send_ID(board_id);
-    // CAN_Send_Pot(board_id, pot_values);
-    // fetch_potentiometer_values(pot_values);
-    
-    get_motor_current_positions();
-    fix_motor_speeds();
-    delay_us(1); // Main loop delay
-  /* USER CODE END WHILE */
+    if (get_time_us() - last_call > 500) {
+      last_call = get_time_us();
+      fix_motor_speeds();
+    }
+    /* USER CODE END WHILE */
 
-  /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }

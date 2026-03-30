@@ -1,5 +1,7 @@
 #include "can_helper.h"
 
+#define LOCATION_MULTIPLIER 7
+
 
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len)
 {
@@ -36,54 +38,53 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     }
     if (data[0] == 0x1) { 
       for(int i = 0; i < 7; i++) {
-        motor_location_set(active_motors[i], data[i+1]*4); 
+        motor_location_set(active_motors[i], data[i+1]*LOCATION_MULTIPLIER); 
       }
     }
     if (data[0] == 0x2) { 
       for(int i = 0; i < 7; i++) {
-        motor_location_set(active_motors[i+7], data[i+1]*4); 
+        motor_location_set(active_motors[i+7], data[i+1]*LOCATION_MULTIPLIER); 
       }
     }
     if (data[0] == 0x3) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_set(active_motors[i+1], data[i+1], data[i+1]); 
-        }
+      set_controller(data[1], data[2], data[3], data[4], data[5], data[6]); 
     }
-    if (data[0] == 0x4) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_set(active_motors[i+7], data[i+1], data[i+1]); 
-        }
-    }
-    if (data[0] == 0x5) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_up_set(active_motors[i+1], data[i+1]); 
-        }
-    }
-    if (data[0] == 0x6) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_up_set(active_motors[i+7], data[i+1]);
-        }
-    }
-    if (data[0] == 0x7) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_down_set(active_motors[i+1], data[i+1]);
-        }
-    }
-    if (data[0] == 0x8) { 
-        for(int i = 0; i < 7; i++) {
-          motor_speed_down_set(active_motors[i+7], data[i+1]);
-        }
-    }
-    if (data[0] == 0xE) { 
-        for(int i = 0; i < 7; i++) {
-          set_motor(active_motors[i], data[i+1]*2-255);
-        }
-    }
-    if (data[0] == 0xF) { 
-        for(int i = 0; i < 7; i++) {
-          set_motor(active_motors[i+7], data[i+1]*2-255);
-        }
-    }
+    // if (data[0] == 0x4) { 
+    //   motor_power_setup(data[1]);
+    // }
+//     if (data[0] == 0x5) { 
+//         for(int i = 0; i < 7; i++) {
+//           motor_speed_up_set(active_motors[i], data[i+1]); 
+//         }
+//     }
+//     if (data[0] == 0x6) { 
+//         for(int i = 0; i < 7; i++) {
+//           motor_speed_up_set(active_motors[i+7], data[i+1]);
+//         }
+//     }
+//     if (data[0] == 0x7) { 
+//         for(int i = 0; i < 7; i++) {
+//           motor_speed_down_set(active_motors[i], data[i+1]);
+//         }
+//     }
+//     if (data[0] == 0x8) { 
+//         for(int i = 0; i < 7; i++) {
+//           motor_speed_down_set(active_motors[i+7], data[i+1]);
+//         }
+//     }
+//     if (data[0] == 0xD) { 
+//       NVIC_SystemReset();
+//     }
+//     if (data[0] == 0xE) { 
+//         for(int i = 0; i < 7; i++) {
+//           set_motor(active_motors[i], data[i+1]*2-255);
+//         }
+//     }
+//     if (data[0] == 0xF) { 
+//         for(int i = 0; i < 7; i++) {
+//           set_motor(active_motors[i+7], data[i+1]*2-255);
+//         }
+//     }
   }
 }
 
