@@ -127,7 +127,7 @@ class MotorCommunication:
 
     def send_frame(self, data, board_id):
         if self.demo:
-            print(f"DEMO -> board {board_id}: {list(data)}")
+            print(f"DEMO -> board {board_id:2d}: [{' '.join(f'{b:3d}' for b in data)}]")
             return
 
         msg = can.Message(
@@ -137,6 +137,7 @@ class MotorCommunication:
         )
         try:
             self.bus.send(msg, timeout=0.1)
+            print(f"CAN -> board {board_id:2d}: [{' '.join(f'{b:3d}' for b in data)}]")
         except can.CanError as e:
             print(f"CAN send failed: {e}")
 
