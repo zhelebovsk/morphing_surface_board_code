@@ -61,11 +61,14 @@ class MainWindow:
         root.addWidget(self._build_bottom_bar())
 
         self._hovered = None
+        self._blink_state = False
+
         self._recolor()
+        self._refresh_dynamic_info()
 
         self._timer = QTimer()
         self._timer.setInterval(20)
-        self._timer.timeout.connect(self._poll_frames)
+        self._timer.timeout.connect(self._poll_everything)
 
     # ── left panel ────────────────────────────────────────────────────────────
 
@@ -76,14 +79,17 @@ class MainWindow:
 
         info = QGroupBox("Active function")
         info_l = QVBoxLayout(info)
+
         func_lbl = QLabel(FUNCTION_DESCRIPTION)
         func_lbl.setWordWrap(True)
         func_lbl.setFont(self._app.font())
         info_l.addWidget(func_lbl)
+
         hint = QLabel("Edit motor_function() in the source\nto change the behaviour.")
         hint.setStyleSheet("color: gray;")
         hint.setWordWrap(True)
         info_l.addWidget(hint)
+
         layout.addWidget(info)
 
         timing = QGroupBox("Timing")
@@ -94,21 +100,46 @@ class MainWindow:
         run = QGroupBox("Run")
         run_l = QVBoxLayout(run)
 
+        # static t
         t_row = QWidget()
         t_layout = QHBoxLayout(t_row)
         t_layout.setContentsMargins(0, 0, 0, 0)
-        t_layout.addWidget(QLabel("t ="))
+
+        t_layout.addWidget(QLabel("static t ="))
         self._static_t = QDoubleSpinBox()
         self._static_t.setRange(-1e9, 1e9)
         self._static_t.setSingleStep(0.1)
         self._static_t.setDecimals(2)
         t_layout.addWidget(self._static_t)
+        t_layout.addStretch(1)
+
         run_l.addWidget(t_row)
 
+        run_static_btn = QPushButton("Run statically")
+        run_static_btn.clicked.connect(self._run_static)
+        run_l.addWidget(run_static_btn)
+
+        # editable dynamic frequency
+        mu_row = QWidget()
+        mu_layout = QHBoxLayout(mu_row)
+        mu_layout.setContentsMargins(0, 0, 0, 0)
+
+        mu_layout.addWidget(QLabel("μ ="))
+        self._mu_input = QDoubleSpinBox()
+        self._mu_input.setRange(0.001, 1000.0)
+        self._mu_input.setSingleStep(0.1)
+        self._mu_input.setDecimals(3)
+        self._mu_input.setValue(1.0)
+        self._mu_input.valueChanged.connect(self._mu_changed)
+        mu_layout.addWidget(self._mu_input)
+        mu_layout.addStretch(1)
+
+        run_l.addWidget(mu_row)
+
         for label, slot in [
-            ("Run statically", self._run_static),
             ("Start dynamic", self._start_dynamic),
             ("Stop dynamic", self._stop_dynamic),
+            ("Reset dynamic", self._reset_dynamic),
         ]:
             btn = QPushButton(label)
             btn.clicked.connect(slot)
@@ -155,34 +186,118 @@ class MainWindow:
                 grid.addWidget(cell, motor + 1, board + 1)
                 self._motor_cells.append(cell)
 
-        layout.addWidget(grid_widget)
-
         x_min = int(-wc.x_center * BOARD_SPACING_MM)
         x_max = int(wc.x_center * BOARD_SPACING_MM)
-        layout.addWidget(QLabel(f"x:  {x_min} … {x_max} mm"), alignment=Qt.AlignHCenter)
+        y_min = int(-wc.y_center * MOTOR_SPACING_MM)
+        y_max = int(wc.y_center * MOTOR_SPACING_MM)
 
-        # hover info strip
+        # bottom x ruler
+        x_range = QLabel(f"x : {x_min:>4} ---- 0 ---- {x_max:<4} [mm]")
+        x_range.setAlignment(Qt.AlignHCenter)
+        x_range.setStyleSheet("padding-top: 6px; padding-bottom: 2px;")
+
+        # build main board + right y ruler side by side
+        board_and_y = QWidget()
+        board_and_y_layout = QHBoxLayout(board_and_y)
+        board_and_y_layout.setContentsMargins(0, 0, 0, 0)
+        board_and_y_layout.setSpacing(10)
+
+        board_column = QWidget()
+        board_column_layout = QVBoxLayout(board_column)
+        board_column_layout.setContentsMargins(0, 0, 0, 0)
+        board_column_layout.setSpacing(4)
+        board_column_layout.addWidget(grid_widget)
+        board_column_layout.addWidget(x_range)
+
+        y_range = QLabel(f"y : {y_max:>4}\n|\n0\n|\n{y_min:<4}\n[mm]")
+        y_range.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
+        y_range.setStyleSheet("padding-left: 6px; padding-right: 6px;")
+
+        board_and_y_layout.addWidget(board_column, stretch=1)
+        board_and_y_layout.addWidget(y_range, alignment=Qt.AlignVCenter)
+
+        layout.addWidget(board_and_y)
+
+        info_strip = QWidget()
+        info_strip_layout = QHBoxLayout(info_strip)
+        info_strip_layout.setContentsMargins(0, 8, 0, 0)
+
+        # hover chunk
         hover_widget = QWidget()
         hover_layout = QHBoxLayout(hover_widget)
-        hover_layout.setContentsMargins(0, 8, 0, 0)
+        hover_layout.setContentsMargins(0, 0, 0, 0)
         self._hover_labels = {}
+
         for h in ["board", "motor", "x", "y", "z"]:
             col = QWidget()
             col_l = QVBoxLayout(col)
             col_l.setSpacing(2)
+
             header = QLabel(h)
             header.setAlignment(Qt.AlignCenter)
-            header.setFixedWidth(100)
-            header.setStyleSheet("font-weight: bold; border: 1px solid gray; padding: 2px;")
+            header.setFixedWidth(110)
+            header.setStyleSheet("border: 1px solid gray; padding: 2px;")
+
             val = QLabel("--")
             val.setAlignment(Qt.AlignCenter)
-            val.setFixedWidth(100)
+            val.setFixedWidth(110)
             val.setStyleSheet("border: 1px solid gray; padding: 2px;")
+
             col_l.addWidget(header)
             col_l.addWidget(val)
             self._hover_labels[h] = val
             hover_layout.addWidget(col)
-        layout.addWidget(hover_widget)
+
+        info_strip_layout.addWidget(hover_widget)
+
+        # dynamic chunk
+        dynamic_widget = QWidget()
+        dynamic_layout = QHBoxLayout(dynamic_widget)
+        dynamic_layout.setContentsMargins(24, 0, 0, 0)
+
+        self._dynamic_labels = {}
+        for h in ["t", "μ", "φ", "N"]:
+            col = QWidget()
+            col_l = QVBoxLayout(col)
+            col_l.setSpacing(2)
+
+            header = QLabel(h)
+            header.setAlignment(Qt.AlignCenter)
+            header.setFixedWidth(110)
+            header.setStyleSheet("border: 1px solid gray; padding: 2px;")
+
+            val = QLabel("--")
+            val.setAlignment(Qt.AlignCenter)
+            val.setFixedWidth(110)
+            val.setStyleSheet("border: 1px solid gray; padding: 2px;")
+
+            col_l.addWidget(header)
+            col_l.addWidget(val)
+            self._dynamic_labels[h] = val
+            dynamic_layout.addWidget(col)
+
+        blink_col = QWidget()
+        blink_col_l = QVBoxLayout(blink_col)
+        blink_col_l.setSpacing(2)
+
+        blink_header = QLabel("blink")
+        blink_header.setAlignment(Qt.AlignCenter)
+        blink_header.setFixedWidth(70)
+        blink_header.setStyleSheet("border: 1px solid gray; padding: 2px;")
+
+        self._blink_label = QLabel("")
+        self._blink_label.setFixedSize(70, 28)
+        self._blink_label.setStyleSheet("border: 1px solid gray; background: rgb(50,50,50);")
+
+        blink_col_l.addWidget(blink_header)
+        blink_col_l.addWidget(self._blink_label, alignment=Qt.AlignCenter)
+        self._dynamic_labels["blink"] = self._blink_label
+        dynamic_layout.addWidget(blink_col)
+
+        info_strip_layout.addWidget(dynamic_widget)
+        info_strip_layout.addStretch(1)
+
+        layout.addWidget(info_strip)
 
         return container
 
@@ -194,20 +309,23 @@ class MainWindow:
 
         sliders_widget = QWidget()
         sliders_layout = QHBoxLayout(sliders_widget)
-        self._kp           = self._add_slider(sliders_layout, "Kp")
-        self._ki           = self._add_slider(sliders_layout, "Ki")
-        self._kd           = self._add_slider(sliders_layout, "Kd")
-        self._alpha        = self._add_slider(sliders_layout, "Alpha")
+        self._kp = self._add_slider(sliders_layout, "Kp")
+        self._ki = self._add_slider(sliders_layout, "Ki")
+        self._kd = self._add_slider(sliders_layout, "Kd")
+        self._alpha = self._add_slider(sliders_layout, "Alpha")
         self._limit_signal = self._add_slider(sliders_layout, "Limit signal")
-        self._deadband     = self._add_slider(sliders_layout, "Deadband")
+        self._deadband = self._add_slider(sliders_layout, "Deadband")
         bar_layout.addWidget(sliders_widget)
 
         btn_widget = QWidget()
         btn_layout = QVBoxLayout(btn_widget)
+
         send_all = QPushButton("Send to all boards")
         send_all.clicked.connect(self._send_config_to_all_boards)
+
         pick = QPushButton("Pick boards")
         pick.clicked.connect(self._open_pick_boards_window)
+
         btn_layout.addWidget(send_all)
         btn_layout.addWidget(pick)
         bar_layout.addWidget(btn_widget)
@@ -218,9 +336,11 @@ class MainWindow:
         col = QWidget()
         col_l = QVBoxLayout(col)
         col_l.addWidget(QLabel(title))
+
         slider = QSlider(Qt.Horizontal)
         slider.setRange(0, 255)
         slider.setFixedWidth(170)
+
         col_l.addWidget(slider)
         layout.addWidget(col)
         return slider
@@ -255,34 +375,68 @@ class MainWindow:
     def _refresh_hover(self):
         if self._hovered is None:
             return
+
         b, m, x, y = self._hovered
         shown = self.engine.displayed_value(b, m)
         z = (shown / 255.0) * 2.0 - 1.0
+
         self._hover_labels["board"].setText(str(b + 1))
         self._hover_labels["motor"].setText(str(m + 1))
         self._hover_labels["x"].setText(f"{x:+.1f} mm")
         self._hover_labels["y"].setText(f"{y:+.1f} mm")
         self._hover_labels["z"].setText(f"{z:+.3f}")
 
+    # ── dynamic info ──────────────────────────────────────────────────────────
+
+    def _refresh_dynamic_info(self):
+        info = self.engine.get_dynamic_info()
+
+        self._dynamic_labels["t"].setText(f"{info['t']:.3f} [s]")
+        self._dynamic_labels["μ"].setText(f"{info['mu']:.3f} [Hz]")
+        self._dynamic_labels["φ"].setText(f"{info['phi']:.3f}")
+        self._dynamic_labels["N"].setText(str(info["N"]))
+
+        blink_now = bool(info["blink"])
+        if blink_now != self._blink_state:
+            self._blink_state = blink_now
+            if blink_now:
+                self._blink_label.setStyleSheet("border: 1px solid gray; background: rgb(0,255,0);")
+            else:
+                self._blink_label.setStyleSheet("border: 1px solid gray; background: rgb(50,50,50);")
+
+    def _mu_changed(self, value):
+        self.engine.set_dynamic_mu(value)
+        self._refresh_dynamic_info()
+
     # ── run controls ──────────────────────────────────────────────────────────
 
     def _run_static(self):
         self.engine.run_static(self._static_t.value())
         self._recolor()
+        self._refresh_dynamic_info()
 
     def _start_dynamic(self):
+        self.engine.set_dynamic_mu(self._mu_input.value())
         self.engine.start_dynamic()
+        self._refresh_dynamic_info()
         self._timer.start()
 
-    def _poll_frames(self):
+    def _poll_everything(self):
         locations = self.engine.drain_frame_queue()
         if locations is not None:
             self.engine.wing_control.locations = locations
             self._recolor()
+        self._refresh_dynamic_info()
 
     def _stop_dynamic(self):
         self.engine.stop_dynamic()
         self._timer.stop()
+        self._refresh_dynamic_info()
+
+    def _reset_dynamic(self):
+        self.engine.reset_dynamic()
+        self._refresh_dynamic_info()
+        self._recolor()
 
     # ── config send ───────────────────────────────────────────────────────────
 
@@ -311,6 +465,7 @@ class MainWindow:
 
         buttons = QWidget()
         btn_l = QHBoxLayout(buttons)
+
         send_btn = QPushButton("Send")
         send_btn.clicked.connect(lambda: [
             self.engine.send_config(
@@ -319,8 +474,10 @@ class MainWindow:
             ),
             dialog.accept(),
         ])
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(dialog.reject)
+
         btn_l.addWidget(send_btn)
         btn_l.addWidget(cancel_btn)
         layout.addWidget(buttons)

@@ -2,8 +2,8 @@ from config import BOARD_COUNT, MOTORS_PER_BOARD
 from limits import load_all_limits
 from engine import ControlMotor
 # currently (Tkinter):
-from gui.setup_window import SetupWindow
-from gui.main_window import MainWindow
+from gui2.setup_window import SetupWindow
+from gui2.main_window import MainWindow
 
 # switch to PySide6:
 # from gui2.setup_window import SetupWindow
