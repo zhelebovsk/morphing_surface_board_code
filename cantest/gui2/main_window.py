@@ -1,0 +1,334 @@
+import sys
+from math import ceil
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QGroupBox, QLabel, QPushButton, QDoubleSpinBox,
+    QSlider, QFrame, QDialog, QCheckBox,
+)
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QPalette
+
+from config import BOARD_SPACING_MM, MOTOR_SPACING_MM
+from function import FUNCTION_DESCRIPTION
+
+
+class _MotorCell(QFrame):
+    def __init__(self, on_enter, on_leave, parent=None):
+        super().__init__(parent)
+        self._on_enter = on_enter
+        self._on_leave = on_leave
+        self.setFrameShape(QFrame.Box)
+        self.setLineWidth(1)
+        self.setAutoFillBackground(True)
+        self.set_color(0, 200, 0)
+
+    def enterEvent(self, event):
+        self._on_enter()
+
+    def leaveEvent(self, event):
+        self._on_leave()
+
+    def set_color(self, r, g, b):
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(r, g, b))
+        self.setPalette(palette)
+
+
+class MainWindow:
+    def __init__(self, engine):
+        self.engine = engine
+        self.board_count = engine.board_count
+        self.motors_per_board = engine.motors_per_board
+
+        self._app = QApplication.instance() or QApplication(sys.argv)
+
+        self._window = QMainWindow()
+        self._window.setWindowTitle("Motor Control")
+        self._window.resize(1650, 900)
+
+        central = QWidget()
+        self._window.setCentralWidget(central)
+        root = QVBoxLayout(central)
+
+        top = QWidget()
+        top_layout = QHBoxLayout(top)
+        root.addWidget(top, stretch=1)
+
+        top_layout.addWidget(self._build_left_panel(), alignment=Qt.AlignTop)
+        top_layout.addWidget(self._build_board_view(), stretch=1)
+
+        root.addWidget(self._build_bottom_bar())
+
+        self._hovered = None
+        self._recolor()
+
+        self._timer = QTimer()
+        self._timer.setInterval(20)
+        self._timer.timeout.connect(self._poll_frames)
+
+    # ── left panel ────────────────────────────────────────────────────────────
+
+    def _build_left_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setAlignment(Qt.AlignTop)
+
+        info = QGroupBox("Active function")
+        info_l = QVBoxLayout(info)
+        func_lbl = QLabel(FUNCTION_DESCRIPTION)
+        func_lbl.setWordWrap(True)
+        func_lbl.setFont(self._app.font())
+        info_l.addWidget(func_lbl)
+        hint = QLabel("Edit motor_function() in the source\nto change the behaviour.")
+        hint.setStyleSheet("color: gray;")
+        hint.setWordWrap(True)
+        info_l.addWidget(hint)
+        layout.addWidget(info)
+
+        timing = QGroupBox("Timing")
+        timing_l = QVBoxLayout(timing)
+        timing_l.addWidget(QLabel(f"Update rate: {self.engine.UPDATE_HZ} Hz"))
+        layout.addWidget(timing)
+
+        run = QGroupBox("Run")
+        run_l = QVBoxLayout(run)
+
+        t_row = QWidget()
+        t_layout = QHBoxLayout(t_row)
+        t_layout.setContentsMargins(0, 0, 0, 0)
+        t_layout.addWidget(QLabel("t ="))
+        self._static_t = QDoubleSpinBox()
+        self._static_t.setRange(-1e9, 1e9)
+        self._static_t.setSingleStep(0.1)
+        self._static_t.setDecimals(2)
+        t_layout.addWidget(self._static_t)
+        run_l.addWidget(t_row)
+
+        for label, slot in [
+            ("Run statically", self._run_static),
+            ("Start dynamic", self._start_dynamic),
+            ("Stop dynamic", self._stop_dynamic),
+        ]:
+            btn = QPushButton(label)
+            btn.clicked.connect(slot)
+            run_l.addWidget(btn)
+
+        layout.addWidget(run)
+        return panel
+
+    # ── board grid ────────────────────────────────────────────────────────────
+
+    def _build_board_view(self):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+
+        grid_widget = QWidget()
+        grid = QGridLayout(grid_widget)
+        grid.setSpacing(1)
+
+        cell_size = max(16, ceil(min(620 / self.motors_per_board, 1200 / self.board_count)))
+
+        for board in range(self.board_count):
+            lbl = QLabel(str(board + 1))
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setFixedWidth(cell_size)
+            grid.addWidget(lbl, 0, board + 1)
+
+        wc = self.engine.wing_control
+        self._motor_cells = []
+
+        for motor in range(self.motors_per_board):
+            row_lbl = QLabel(str(motor + 1))
+            row_lbl.setAlignment(Qt.AlignCenter)
+            grid.addWidget(row_lbl, motor + 1, 0)
+
+            for board in range(self.board_count):
+                x_mm = (board - wc.x_center) * BOARD_SPACING_MM
+                y_mm = (wc.y_center - motor) * MOTOR_SPACING_MM
+
+                cell = _MotorCell(
+                    on_enter=lambda b=board, m=motor, x=x_mm, y=y_mm: self._on_hover(b, m, x, y),
+                    on_leave=self._on_hover_clear,
+                )
+                cell.setFixedSize(cell_size, cell_size)
+                grid.addWidget(cell, motor + 1, board + 1)
+                self._motor_cells.append(cell)
+
+        layout.addWidget(grid_widget)
+
+        x_min = int(-wc.x_center * BOARD_SPACING_MM)
+        x_max = int(wc.x_center * BOARD_SPACING_MM)
+        layout.addWidget(QLabel(f"x:  {x_min} … {x_max} mm"), alignment=Qt.AlignHCenter)
+
+        # hover info strip
+        hover_widget = QWidget()
+        hover_layout = QHBoxLayout(hover_widget)
+        hover_layout.setContentsMargins(0, 8, 0, 0)
+        self._hover_labels = {}
+        for h in ["board", "motor", "x", "y", "z"]:
+            col = QWidget()
+            col_l = QVBoxLayout(col)
+            col_l.setSpacing(2)
+            header = QLabel(h)
+            header.setAlignment(Qt.AlignCenter)
+            header.setFixedWidth(100)
+            header.setStyleSheet("font-weight: bold; border: 1px solid gray; padding: 2px;")
+            val = QLabel("--")
+            val.setAlignment(Qt.AlignCenter)
+            val.setFixedWidth(100)
+            val.setStyleSheet("border: 1px solid gray; padding: 2px;")
+            col_l.addWidget(header)
+            col_l.addWidget(val)
+            self._hover_labels[h] = val
+            hover_layout.addWidget(col)
+        layout.addWidget(hover_widget)
+
+        return container
+
+    # ── bottom config bar ─────────────────────────────────────────────────────
+
+    def _build_bottom_bar(self):
+        bar = QGroupBox("Board config packet")
+        bar_layout = QHBoxLayout(bar)
+
+        sliders_widget = QWidget()
+        sliders_layout = QHBoxLayout(sliders_widget)
+        self._kp           = self._add_slider(sliders_layout, "Kp")
+        self._ki           = self._add_slider(sliders_layout, "Ki")
+        self._kd           = self._add_slider(sliders_layout, "Kd")
+        self._alpha        = self._add_slider(sliders_layout, "Alpha")
+        self._limit_signal = self._add_slider(sliders_layout, "Limit signal")
+        self._deadband     = self._add_slider(sliders_layout, "Deadband")
+        bar_layout.addWidget(sliders_widget)
+
+        btn_widget = QWidget()
+        btn_layout = QVBoxLayout(btn_widget)
+        send_all = QPushButton("Send to all boards")
+        send_all.clicked.connect(self._send_config_to_all_boards)
+        pick = QPushButton("Pick boards")
+        pick.clicked.connect(self._open_pick_boards_window)
+        btn_layout.addWidget(send_all)
+        btn_layout.addWidget(pick)
+        bar_layout.addWidget(btn_widget)
+
+        return bar
+
+    def _add_slider(self, layout, title):
+        col = QWidget()
+        col_l = QVBoxLayout(col)
+        col_l.addWidget(QLabel(title))
+        slider = QSlider(Qt.Horizontal)
+        slider.setRange(0, 255)
+        slider.setFixedWidth(170)
+        col_l.addWidget(slider)
+        layout.addWidget(col)
+        return slider
+
+    # ── recolor ───────────────────────────────────────────────────────────────
+
+    def _recolor(self):
+        counter = 0
+        for motor in range(self.motors_per_board):
+            for board in range(self.board_count):
+                shown = self.engine.displayed_value(board, motor)
+                t = max(-1.0, min(1.0, (shown / 255.0) * 2.0 - 1.0))
+                if t >= 0:
+                    r, g, b = 255, round(255 * (1 - t)), round(255 * (1 - t))
+                else:
+                    r, g, b = round(255 * (1 + t)), round(255 * (1 + t)), 255
+                self._motor_cells[counter].set_color(r, g, b)
+                counter += 1
+        self._refresh_hover()
+
+    # ── hover ─────────────────────────────────────────────────────────────────
+
+    def _on_hover(self, board, motor, x_mm, y_mm):
+        self._hovered = (board, motor, x_mm, y_mm)
+        self._refresh_hover()
+
+    def _on_hover_clear(self):
+        self._hovered = None
+        for v in self._hover_labels.values():
+            v.setText("--")
+
+    def _refresh_hover(self):
+        if self._hovered is None:
+            return
+        b, m, x, y = self._hovered
+        shown = self.engine.displayed_value(b, m)
+        z = (shown / 255.0) * 2.0 - 1.0
+        self._hover_labels["board"].setText(str(b + 1))
+        self._hover_labels["motor"].setText(str(m + 1))
+        self._hover_labels["x"].setText(f"{x:+.1f} mm")
+        self._hover_labels["y"].setText(f"{y:+.1f} mm")
+        self._hover_labels["z"].setText(f"{z:+.3f}")
+
+    # ── run controls ──────────────────────────────────────────────────────────
+
+    def _run_static(self):
+        self.engine.run_static(self._static_t.value())
+        self._recolor()
+
+    def _start_dynamic(self):
+        self.engine.start_dynamic()
+        self._timer.start()
+
+    def _poll_frames(self):
+        locations = self.engine.drain_frame_queue()
+        if locations is not None:
+            self.engine.wing_control.locations = locations
+            self._recolor()
+
+    def _stop_dynamic(self):
+        self.engine.stop_dynamic()
+        self._timer.stop()
+
+    # ── config send ───────────────────────────────────────────────────────────
+
+    def _config_values(self):
+        return (
+            self._kp.value(), self._ki.value(), self._kd.value(),
+            self._alpha.value(), self._limit_signal.value(), self._deadband.value(),
+        )
+
+    def _send_config_to_all_boards(self):
+        self.engine.send_config(range(1, self.board_count + 1), *self._config_values())
+
+    def _open_pick_boards_window(self):
+        dialog = QDialog(self._window)
+        dialog.setWindowTitle("Pick boards")
+        layout = QVBoxLayout(dialog)
+
+        grid = QWidget()
+        grid_l = QGridLayout(grid)
+        checks = []
+        for i in range(self.board_count):
+            cb = QCheckBox(f"Board {i + 1}")
+            checks.append(cb)
+            grid_l.addWidget(cb, i // 4, i % 4)
+        layout.addWidget(grid)
+
+        buttons = QWidget()
+        btn_l = QHBoxLayout(buttons)
+        send_btn = QPushButton("Send")
+        send_btn.clicked.connect(lambda: [
+            self.engine.send_config(
+                [i + 1 for i, cb in enumerate(checks) if cb.isChecked()],
+                *self._config_values()
+            ),
+            dialog.accept(),
+        ])
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_l.addWidget(send_btn)
+        btn_l.addWidget(cancel_btn)
+        layout.addWidget(buttons)
+
+        dialog.exec()
+
+    # ── entry point ───────────────────────────────────────────────────────────
+
+    def start(self):
+        self._window.show()
+        self._app.exec()
