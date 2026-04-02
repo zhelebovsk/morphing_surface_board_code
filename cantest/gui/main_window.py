@@ -4,7 +4,7 @@ from math import ceil
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QGroupBox, QLabel, QPushButton, QDoubleSpinBox,
-    QSlider, QFrame, QDialog, QCheckBox,
+    QSlider, QSpinBox, QFrame, QDialog, QCheckBox,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QPalette
@@ -317,12 +317,12 @@ class MainWindow:
 
         sliders_widget = QWidget()
         sliders_layout = QHBoxLayout(sliders_widget)
-        self._kp = self._add_slider(sliders_layout, "Kp")
-        self._ki = self._add_slider(sliders_layout, "Ki")
-        self._kd = self._add_slider(sliders_layout, "Kd")
-        self._alpha = self._add_slider(sliders_layout, "Alpha")
-        self._limit_signal = self._add_slider(sliders_layout, "Limit signal")
-        self._deadband = self._add_slider(sliders_layout, "Deadband")
+        self._kp = self._add_slider(sliders_layout, "Kp", default=51)
+        self._ki = self._add_slider(sliders_layout, "Ki", default=26)
+        self._kd = self._add_slider(sliders_layout, "Kd", default=0)
+        self._alpha = self._add_slider(sliders_layout, "Alpha", default=51)
+        self._limit_signal = self._add_slider(sliders_layout, "Limit signal", default=100)
+        self._deadband = self._add_slider(sliders_layout, "Deadband", default=10)
         bar_layout.addWidget(sliders_widget)
 
         btn_widget = QWidget()
@@ -340,18 +340,34 @@ class MainWindow:
 
         return bar
 
-    def _add_slider(self, layout, title):
+    def _add_slider(self, layout, title, default=0):
         col = QWidget()
         col_l = QVBoxLayout(col)
         col_l.addWidget(QLabel(title))
 
+        row = QWidget()
+        row_l = QHBoxLayout(row)
+        row_l.setContentsMargins(0, 0, 0, 0)
+        row_l.setSpacing(4)
+
         slider = QSlider(Qt.Horizontal)
         slider.setRange(0, 255)
-        slider.setFixedWidth(170)
+        slider.setFixedWidth(130)
 
-        col_l.addWidget(slider)
+        spinbox = QSpinBox()
+        spinbox.setRange(0, 255)
+        spinbox.setFixedWidth(55)
+
+        slider.valueChanged.connect(spinbox.setValue)
+        spinbox.valueChanged.connect(slider.setValue)
+
+        spinbox.setValue(default)
+
+        row_l.addWidget(slider)
+        row_l.addWidget(spinbox)
+        col_l.addWidget(row)
         layout.addWidget(col)
-        return slider
+        return spinbox
 
     # ── recolor ───────────────────────────────────────────────────────────────
 

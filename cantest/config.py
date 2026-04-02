@@ -7,8 +7,8 @@ BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
 BOARD_COUNT = 30
 MOTORS_PER_BOARD = 14
 
-MIN_LIMITS_FILE = "motor_min.csv"
-MAX_LIMITS_FILE = "motor_max.csv"
+MIN_LIMITS_FILE = "cantest/motor_min.csv"
+MAX_LIMITS_FILE = "cantest/motor_max.csv"
 
 DEFAULT_MIN_LIMIT = 100
 DEFAULT_MAX_LIMIT = 150
