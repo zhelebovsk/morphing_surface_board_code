@@ -1,6 +1,6 @@
 import os
 import csv
-from config import BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, MAX_LIMITS_FILE
+from config import BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, MAX_LIMITS_FILE, DEFAULT_MIN_LIMIT, DEFAULT_MAX_LIMIT
 from utils import clamp8    
 
 def create_default_limit_file(path, default_value):
@@ -39,8 +39,8 @@ def load_limit_file(path, default_value):
 
 
 def load_all_limits():
-    min_limits = load_limit_file(MIN_LIMITS_FILE, 0)
-    max_limits = load_limit_file(MAX_LIMITS_FILE, 255)
+    min_limits = load_limit_file(MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT)
+    max_limits = load_limit_file(MAX_LIMITS_FILE, DEFAULT_MAX_LIMIT)
 
     for board in range(BOARD_COUNT):
         for motor in range(MOTORS_PER_BOARD):

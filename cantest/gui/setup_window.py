@@ -1,30 +1,38 @@
-from tkinter import Tk, Label, StringVar, LEFT, Button, OptionMenu
+import sys
+from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QLabel, QComboBox, QPushButton
 
 from communication import can_search
-from config import SCALING_FACTOR
 
 
 class SetupWindow:
     def __init__(self):
+        self._app = QApplication.instance() or QApplication(sys.argv)
+
         channels = can_search()
-
-        self.window = Tk()
-        self.window.tk.call('tk', 'scaling', SCALING_FACTOR)
-        self.window.title("GUI setup")
-        self.window.geometry("960x120")
-        self.window.resizable(False, False)
-
-        self.channel_choice = StringVar(value=channels[0])
         self.started = False
+        self._channel = channels[0]
 
-        Label(self.window, text="CAN channel:").pack(side=LEFT, padx=4, pady=8)
-        OptionMenu(self.window, self.channel_choice, *channels).pack(side=LEFT, padx=4, pady=8)
-        Button(self.window, text="Start", command=self.on_start).pack(side=LEFT, padx=8, pady=8)
-        self.window.mainloop()
+        dialog = QDialog()
+        dialog.setWindowTitle("Setup")
+        dialog.setFixedHeight(60)
 
-    def on_start(self):
+        layout = QHBoxLayout(dialog)
+        layout.addWidget(QLabel("CAN channel:"))
+
+        self._combo = QComboBox()
+        self._combo.addItems(channels)
+        layout.addWidget(self._combo)
+
+        btn = QPushButton("Start")
+        btn.clicked.connect(lambda: self._on_start(dialog))
+        layout.addWidget(btn)
+
+        dialog.exec()
+
+    def _on_start(self, dialog):
         self.started = True
-        self.window.destroy()
+        self._channel = self._combo.currentText()
+        dialog.accept()
 
     def get_channel(self):
-        return self.channel_choice.get()
+        return self._channel

@@ -2,19 +2,15 @@ import queue
 import threading
 import time
 
-from config import BOARD_COUNT, MOTORS_PER_BOARD, REFACTORING
+from config import BOARD_COUNT, MOTORS_PER_BOARD, REFACTORING, DYNAMIC_CYCLE_HZ, BLINK_DURATION_SEC, UPDATE_HZ
 from wingcontrol import WingControl
 from communication import MotorCommunication
 from utils import clamp8
 from function import motor_function
 
 
-DYNAMIC_CYCLE_HZ = 1.0
-BLINK_DURATION_SEC = 0.10
-
 
 class ControlMotor:
-    UPDATE_HZ = 100.0
     UPDATE_DT = 1.0 / UPDATE_HZ
 
     def __init__(self, channel, min_limits, max_limits, range_of_motion,
@@ -147,6 +143,12 @@ class ControlMotor:
         except queue.Empty:
             pass
         return latest
+
+    def reload_limits(self):
+        from limits import load_all_limits
+        min_limits, max_limits = load_all_limits()
+        self.communication.min_limits = min_limits
+        self.communication.max_limits = max_limits
 
     def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband):
         for board_id in board_ids:
