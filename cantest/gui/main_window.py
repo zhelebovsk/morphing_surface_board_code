@@ -6,11 +6,12 @@ from PySide6.QtWidgets import (
     QGridLayout, QGroupBox, QLabel, QPushButton, QDoubleSpinBox,
     QSlider, QSpinBox, QFrame, QDialog, QCheckBox,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PySide6.QtGui import QColor, QPalette
 
 from config import BOARD_SPACING_MM, MOTOR_SPACING_MM
-from config import FUNCTION_DESCRIPTION, UPDATE_HZ
+from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE, MAX_LIMITS_FILE
+from gui.calib_window import CalibrationWindow
 
 
 class _MotorCell(QFrame):
@@ -69,6 +70,9 @@ class MainWindow:
         self._timer = QTimer()
         self._timer.setInterval(20)
         self._timer.timeout.connect(self._poll_everything)
+
+        self._file_watcher = QFileSystemWatcher([MIN_LIMITS_FILE, MAX_LIMITS_FILE])
+        self._file_watcher.fileChanged.connect(self._on_limits_file_changed)
 
     # ── left panel ────────────────────────────────────────────────────────────
 
@@ -152,6 +156,9 @@ class MainWindow:
         reload_btn = QPushButton("Reload limits")
         reload_btn.clicked.connect(self._reload_limits)
         calib_l.addWidget(reload_btn)
+        edit_btn = QPushButton("Edit limits")
+        edit_btn.clicked.connect(self._open_calib_window)
+        calib_l.addWidget(edit_btn)
         layout.addWidget(calib)
 
         return panel
@@ -465,6 +472,15 @@ class MainWindow:
     def _reload_limits(self):
         self.engine.reload_limits()
         self._recolor()
+
+    def _on_limits_file_changed(self, path):
+        # some editors replace the file (delete + rewrite) which drops it from the watcher
+        self._file_watcher.addPath(path)
+        self.engine.reload_limits()
+        self._recolor()
+
+    def _open_calib_window(self):
+        CalibrationWindow(self.engine, parent=self._window).show()
 
     # ── config send ───────────────────────────────────────────────────────────
 

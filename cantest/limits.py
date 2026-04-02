@@ -38,6 +38,14 @@ def load_limit_file(path, default_value):
     return limits
 
 
+def save_limit_file(path, limits):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["board"] + [f"m{i}" for i in range(1, MOTORS_PER_BOARD + 1)])
+        for board_index, row in enumerate(limits):
+            writer.writerow([board_index + 1] + [clamp8(v) for v in row])
+
+
 def load_all_limits():
     min_limits = load_limit_file(MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT)
     max_limits = load_limit_file(MAX_LIMITS_FILE, DEFAULT_MAX_LIMIT)
