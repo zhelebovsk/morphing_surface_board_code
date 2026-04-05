@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PySide6.QtGui import QColor, QPalette
 
 from config import BOARD_SPACING_MM, MOTOR_SPACING_MM
-from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE, MAX_LIMITS_FILE
+from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE
 from gui.calib_window import CalibrationWindow
 
 
@@ -71,7 +71,7 @@ class MainWindow:
         self._timer.setInterval(20)
         self._timer.timeout.connect(self._poll_everything)
 
-        self._file_watcher = QFileSystemWatcher([MIN_LIMITS_FILE, MAX_LIMITS_FILE])
+        self._file_watcher = QFileSystemWatcher([MIN_LIMITS_FILE])
         self._file_watcher.fileChanged.connect(self._on_limits_file_changed)
 
     # ── left panel ────────────────────────────────────────────────────────────

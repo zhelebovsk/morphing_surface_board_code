@@ -11,12 +11,11 @@ if __name__ == "__main__":
 
     if setup.started:
         channel = setup.get_channel()
-        min_limits, max_limits = load_all_limits()
+        min_limits, _ = load_all_limits()
 
         motor = ControlMotor(
             channel=channel,
             min_limits=min_limits,
-            max_limits=max_limits,
             range_of_motion=255,
             board_count=BOARD_COUNT,
             motors_per_board=MOTORS_PER_BOARD,

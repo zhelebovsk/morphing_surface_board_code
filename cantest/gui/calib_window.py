@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from limits import save_limit_file, load_all_limits
-from config import MIN_LIMITS_FILE, MAX_LIMITS_FILE
+from config import MIN_LIMITS_FILE
 
 
 class CalibrationWindow:
@@ -29,9 +29,7 @@ class CalibrationWindow:
 
         self._tabs = QTabWidget()
         self._min_table = self._make_table()
-        self._max_table = self._make_table()
         self._tabs.addTab(self._wrap_tab(self._min_table, "min"), "Min limits")
-        self._tabs.addTab(self._wrap_tab(self._max_table, "max"), "Max limits")
         root.addWidget(self._tabs, stretch=1)
 
         # bottom buttons
@@ -54,7 +52,8 @@ class CalibrationWindow:
         btn_l.addWidget(close_btn)
         root.addWidget(btn_row)
 
-        self._load_data(*load_all_limits())
+        min_limits, _ = load_all_limits()
+        self._load_data(min_limits)
 
     # ── table factory ─────────────────────────────────────────────────────────
 
@@ -97,11 +96,10 @@ class CalibrationWindow:
 
     # ── data helpers ──────────────────────────────────────────────────────────
 
-    def _load_data(self, min_limits, max_limits):
+    def _load_data(self, min_limits):
         for m in range(self._motors):
             for b in range(self._board_count):
                 self._set_cell(self._min_table, m, b, min_limits[b][m])
-                self._set_cell(self._max_table, m, b, max_limits[b][m])
 
     def _set_cell(self, table, row, col, value):
         item = QTableWidgetItem(str(int(value)))
@@ -138,36 +136,14 @@ class CalibrationWindow:
     # ── save / reload ─────────────────────────────────────────────────────────
 
     def _save(self):
-        from config import DEFAULT_MIN_LIMIT, DEFAULT_MAX_LIMIT
+        from config import DEFAULT_MIN_LIMIT
         min_limits = self._read_table(self._min_table, DEFAULT_MIN_LIMIT)
-        max_limits = self._read_table(self._max_table, DEFAULT_MAX_LIMIT)
-
-        # highlight min > max violations
-        violations = 0
-        for b in range(self._board_count):
-            for m in range(self._motors):
-                if min_limits[b][m] > max_limits[b][m]:
-                    violations += 1
-                    self._min_table.item(m, b).setBackground(QColor(255, 180, 180))
-                    self._max_table.item(m, b).setBackground(QColor(255, 180, 180))
-                else:
-                    self._min_table.item(m, b).setBackground(QColor(255, 255, 255))
-                    self._max_table.item(m, b).setBackground(QColor(255, 255, 255))
-
-        if violations:
-            QMessageBox.warning(
-                self._dialog, "Validation error",
-                f"{violations} cell(s) have min > max (highlighted in red).\n"
-                "Fix them before saving."
-            )
-            return
-
         save_limit_file(MIN_LIMITS_FILE, min_limits)
-        save_limit_file(MAX_LIMITS_FILE, max_limits)
         self._engine.reload_limits()
 
     def _reload(self):
-        self._load_data(*load_all_limits())
+        min_limits, _ = load_all_limits()
+        self._load_data(min_limits)
 
     # ── entry point ───────────────────────────────────────────────────────────
 
