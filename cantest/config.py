@@ -8,10 +8,9 @@ BOARD_COUNT = 30
 MOTORS_PER_BOARD = 14
 
 MIN_LIMITS_FILE = "cantest/motor_min.csv"
-MAX_LIMITS_FILE = "cantest/motor_max.csv"
 
 DEFAULT_MIN_LIMIT = 100
-DEFAULT_MAX_LIMIT = 150
+MOTOR_RANGE = 40
 
 FUNCTION_DESCRIPTION = "u(x, y, t)"
 

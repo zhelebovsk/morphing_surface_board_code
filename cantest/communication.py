@@ -1,5 +1,5 @@
 import can
-from config import REFACTORING
+from config import REFACTORING, MOTOR_RANGE
 from utils import clamp8
 import os
 
@@ -14,11 +14,10 @@ def can_search():
     return channels
 
 class MotorCommunication:
-    def __init__(self, channel, min_limits, max_limits):
+    def __init__(self, channel, min_limits):
         self.bus = None
         self.demo = (channel == "DEMO-MODE")
         self.min_limits = min_limits
-        self.max_limits = max_limits
 
         if not self.demo:
             try:
@@ -48,7 +47,7 @@ class MotorCommunication:
             return clamp8(destination)
 
         motor_min = self.min_limits[board_index][motor_index]
-        motor_max = self.max_limits[board_index][motor_index]
+        motor_max = min(motor_min + MOTOR_RANGE, 255)
 
         mapped = motor_min + destination * (motor_max - motor_min) / 255.0
         return clamp8(mapped)

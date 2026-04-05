@@ -13,7 +13,7 @@ from function import motor_function
 class ControlMotor:
     UPDATE_DT = 1.0 / UPDATE_HZ
 
-    def __init__(self, channel, min_limits, max_limits, range_of_motion,
+    def __init__(self, channel, min_limits, range_of_motion,
                  board_count=BOARD_COUNT, motors_per_board=MOTORS_PER_BOARD):
         self.board_count = board_count
         self.motors_per_board = motors_per_board
@@ -24,7 +24,7 @@ class ControlMotor:
             motors_per_board,
             offset=0
         )
-        self.communication = MotorCommunication(channel, min_limits, max_limits)
+        self.communication = MotorCommunication(channel, min_limits)
 
         self.running = False
         self.step_index = 0
@@ -146,9 +146,8 @@ class ControlMotor:
 
     def reload_limits(self):
         from limits import load_all_limits
-        min_limits, max_limits = load_all_limits()
+        min_limits, _ = load_all_limits()
         self.communication.min_limits = min_limits
-        self.communication.max_limits = max_limits
 
     def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband):
         for board_id in board_ids:
