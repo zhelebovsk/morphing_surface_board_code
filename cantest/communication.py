@@ -1,3 +1,5 @@
+import time
+
 import can
 from config import REFACTORING, MOTOR_RANGE
 from utils import clamp8
@@ -60,7 +62,7 @@ class MotorCommunication:
             print(f"ERROR: expected 14 motors per board, got {motors_per_board}")
             return
 
-        for board_index in range(board_count):
+        for board_index in reversed(range(board_count)):
             board_id = board_index + 1
 
             data_low = bytes(
@@ -74,6 +76,7 @@ class MotorCommunication:
 
             self.send_frame(data_high, board_id)
             self.send_frame(data_low, board_id)
+            time.sleep(0.0005)
 
     def send_board_config(self, board_id, kp, ki, kd, alpha, limit_signal, deadband):
         data = bytes([
