@@ -2,7 +2,6 @@
 #include "timer_helper.h"
 
 #define INIT_SAMPLES 1000
-#define DT 0.0005f
 
 #define HI_LIMIT 3415 // 2.5V DAC output
 #define LO_LIMIT 680 // 0.5V
@@ -158,6 +157,11 @@ void set_motor(uint8_t motor_id, int16_t motor_set) {
 }
 
 void fix_motor_speeds(){
+  static uint32_t last_time_us = 0;
+  uint32_t now = get_time_us();
+  float dt = (last_time_us == 0) ? 0.0005f : (float)(now - last_time_us) / 1e6f;
+  last_time_us = now;
+
   update_potentiometer_values();
   for(int i = 0; i < MOTOR_AMOUNT; i++) {
     float e = (float)desired_position[i] - pot_filtered[i];
@@ -170,11 +174,11 @@ void fix_motor_speeds(){
       continue;
     }
     // Integral with anti-windup
-    integral[i] += e * DT;
+    integral[i] += e * dt;
     if (integral[i] > 500) integral[i] = 500;
     if (integral[i] < -500) integral[i] = -500;
     // Derivative
-    float derivative = (e - prev_error[i]) / DT;
+    float derivative = (e - prev_error[i]) / dt;
     prev_error[i] = e;
     // PID output
     float u = Kp * e + Ki * integral[i] + Kd * derivative;

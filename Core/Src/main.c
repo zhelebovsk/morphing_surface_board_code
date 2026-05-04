@@ -134,7 +134,7 @@ int main(void)
   position_init();
   uint32_t last_call = 0;
   while (1) {
-    if (get_time_us() - last_call > 500) {
+    if (get_time_us() - last_call > 100) {
       last_call = get_time_us();
       fix_motor_speeds();
     }
