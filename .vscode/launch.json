@@ -12,6 +12,8 @@
             "device": "STM32G474RETx",
             "runToEntryPoint": "main",
             "svdFile": "${workspaceRoot}/svd/STM32G474RETx.svd",
+            "gdbPath": "gdb-multiarch",
+            "searchDir": ["/usr/share/openocd/scripts"],
             "configFiles": [
                 "interface/stlink.cfg",
                 "target/stm32g4x.cfg"

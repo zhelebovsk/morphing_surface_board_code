@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-05-04T12:59:32.886469",
+  "theoretical": {
+    "sysclk_mhz": 170.0,
+    "adc_clock_mhz": 42.5,
+    "sampling_cycles": 24.5,
+    "conversion_cycles": 12.5,
+    "cycles_per_channel": 37.0,
+    "adc1_channels": 13,
+    "adc2_channels": 3,
+    "adc1_sequence_us": 11.318,
+    "adc2_sequence_us": 2.612,
+    "bottleneck_adc": "ADC1",
+    "bottleneck_us": 11.318,
+    "theoretical_max_hz": 88357.6,
+    "control_loop_hz": 2000.0,
+    "note": "ADC1 is the bottleneck (13 ch). Hardware can do 88358 Hz, but the control loop in main.c only triggers every 500 \u00b5s \u2192 2000 Hz actual rate."
+  },
+  "measured": {
+    "conv_counter_start": 2307629,
+    "conv_counter_end": 2311624,
+    "delta_conversions": 3995,
+    "elapsed_sec": 2.0002,
+    "actual_hz": 1997.33
+  },
+  "error": null
+}
