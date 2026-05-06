@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-04T12:59:32.886469",
+  "timestamp": "2026-05-04T15:34:18.582009",
   "theoretical": {
     "sysclk_mhz": 170.0,
     "adc_clock_mhz": 42.5,
@@ -17,11 +17,11 @@
     "note": "ADC1 is the bottleneck (13 ch). Hardware can do 88358 Hz, but the control loop in main.c only triggers every 500 \u00b5s \u2192 2000 Hz actual rate."
   },
   "measured": {
-    "conv_counter_start": 2307629,
-    "conv_counter_end": 2311624,
-    "delta_conversions": 3995,
-    "elapsed_sec": 2.0002,
-    "actual_hz": 1997.33
+    "conv_counter_start": 120615,
+    "conv_counter_end": 140391,
+    "delta_conversions": 19776,
+    "elapsed_sec": 2.0003,
+    "actual_hz": 9886.5
   },
   "error": null
 }
