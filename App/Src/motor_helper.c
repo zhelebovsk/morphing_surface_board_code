@@ -140,7 +140,11 @@ void position_init() {
 }
 
 void motor_location_set(uint8_t motor_id, uint16_t location) {
-	desired_position[motor_id] = pot_zero + location;
+	if (motor_id >= MOTOR_AMOUNT) return;
+	uint16_t pos = pot_zero + location;
+	if (pos < LO_LIMIT) pos = LO_LIMIT;
+	if (pos > HI_LIMIT) pos = HI_LIMIT;
+	desired_position[motor_id] = pos;
 }
 
 // Motor direct control
@@ -164,6 +168,14 @@ void fix_motor_speeds(){
 
   update_potentiometer_values();
   for(int i = 0; i < MOTOR_AMOUNT; i++) {
+    // Hard stop: if actual position is outside safe bounds, cut motor and reset state
+    if (pot_filtered[i] < LO_LIMIT || pot_filtered[i] > HI_LIMIT) {
+      integral[i] = 0;
+      prev_error[i] = 0;
+      motor_speeds[i] = 0;
+      set_motor(i, 0);
+      continue;
+    }
     float e = (float)desired_position[i] - pot_filtered[i];
     error[i] = e;
     if (fabsf(e) < deadband) {
@@ -197,6 +209,7 @@ void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim
   Ki = (float)ki / 255.0f; // Scale Ki to [0, 1]
   Kd = (float)kd / 255.0f; // Scale Kd to [0, 1]
   alpha = (float)a / 255.0f; // Scale alpha to [0, 1]
+  if (alpha < 0.01f) alpha = 0.01f; // Prevent filter freeze
   u_limit = u_lim;
   deadband = db;
 }
