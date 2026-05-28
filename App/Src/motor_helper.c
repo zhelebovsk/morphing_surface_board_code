@@ -209,7 +209,9 @@ void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim
   Ki = (float)ki / 255.0f; // Scale Ki to [0, 1]
   Kd = (float)kd / 255.0f; // Scale Kd to [0, 1]
   alpha = (float)a / 255.0f; // Scale alpha to [0, 1]
-  if (alpha < 0.01f) alpha = 0.01f; // Prevent filter freeze
+  if (alpha < 0.1f) alpha = 0.1f; // at 10k hrz , adc gives real freq  160
+  if (alpha > 0.8f) alpha = 0.8f; // at 10k hrz , adc gives real freq  1280
+
   u_limit = u_lim;
   deadband = db;
 }
