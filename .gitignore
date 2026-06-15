@@ -5,6 +5,10 @@ Release/
 Drivers/
 Middlewares/
 
+# IDE files
+.idea/
+*.mxproject
+
 # CubeIDE/Eclipse files
 *.metadata
 *.launch
