@@ -177,3 +177,4 @@ HAL_StatusTypeDef EEPROM_FullRead(uint8_t *pBuffer) {
     return EEPROM_Read_Sequential(0x0000, pBuffer, 4096);
 }
 /* USER CODE END 1 */
+

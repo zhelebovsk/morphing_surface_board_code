@@ -10,6 +10,9 @@
 
 #define MOTOR_AMOUNT 16
 
+extern uint16_t pot_raw[MOTOR_AMOUNT];
+extern float    pot_filtered[MOTOR_AMOUNT];
+
 // Startup
 void motor_power_setup(uint8_t mode);
 void Calibrate_ADC(void);
@@ -24,7 +27,7 @@ void motor_location_set(uint8_t motor_id, uint16_t location);
 void fix_motor_speeds();
 
 
-void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim, uint8_t db);
+void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim, uint8_t db, uint8_t min_p);
 
 // void fetch_potentiometer_values(void);
 // void set_motor(uint8_t motor_id, int16_t motor_set);

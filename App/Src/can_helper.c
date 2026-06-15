@@ -2,6 +2,31 @@
 
 #define LOCATION_MULTIPLIER 7
 
+static uint8_t  stream_enabled     = 0;
+static uint8_t  stream_motor_id    = 0;
+static uint32_t stream_interval_us = 10000;  // default 100 Hz
+static uint32_t last_stream_us     = 0;
+
+void CAN_Stream_Update(void) {
+    if (!stream_enabled) return;
+    uint32_t now = get_time_us();
+    if (now - last_stream_us < stream_interval_us) return;
+    last_stream_us = now;
+
+    uint16_t raw  = pot_raw[stream_motor_id];
+    int16_t  filt = (int16_t)pot_filtered[stream_motor_id];
+    uint16_t ts   = (uint16_t)(now & 0xFFFF);
+
+    uint8_t data[8] = {
+        0xA0,
+        stream_motor_id,
+        (uint8_t)(raw  & 0xFF), (uint8_t)(raw  >> 8),
+        (uint8_t)(filt & 0xFF), (uint8_t)((uint16_t)filt >> 8),
+        (uint8_t)(ts   & 0xFF), (uint8_t)(ts   >> 8),
+    };
+    CAN_Send(board_id, data, FDCAN_DLC_BYTES_8);
+}
+
 
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len)
 {
@@ -46,8 +71,17 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         motor_location_set(active_motors[i+7], data[i+1]*LOCATION_MULTIPLIER); 
       }
     }
-    if (data[0] == 0x3) { 
-      set_controller(data[1], data[2], data[3], data[4], data[5], data[6]); 
+    if (data[0] == 0x3) {
+      set_controller(data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+    }
+    if (data[0] == 0x4) {
+      stream_motor_id    = data[1];
+      stream_interval_us = data[2] * 1000;  // data[2] in ms
+      stream_enabled     = 1;
+      last_stream_us     = get_time_us();
+    }
+    if (data[0] == 0x5) {
+      stream_enabled = 0;
     }
     // if (data[0] == 0x4) { 
     //   motor_power_setup(data[1]);

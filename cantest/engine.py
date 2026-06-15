@@ -149,8 +149,8 @@ class ControlMotor:
         min_limits, _ = load_all_limits()
         self.communication.min_limits = min_limits
 
-    def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband):
+    def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband, min_pwm=20):
         for board_id in board_ids:
             self.communication.send_board_config(
-                board_id, kp, ki, kd, alpha, limit_signal, deadband
+                board_id, kp, ki, kd, alpha, limit_signal, deadband, min_pwm
             )

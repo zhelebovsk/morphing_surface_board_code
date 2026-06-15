@@ -75,7 +75,7 @@ class MotorCommunication:
             self.send_frame(data_high, board_id)
             self.send_frame(data_low, board_id)
 
-    def send_board_config(self, board_id, kp, ki, kd, alpha, limit_signal, deadband):
+    def send_board_config(self, board_id, kp, ki, kd, alpha, limit_signal, deadband, min_pwm=20):
         data = bytes([
             3,
             clamp8(kp),
@@ -84,6 +84,6 @@ class MotorCommunication:
             clamp8(alpha),
             clamp8(limit_signal),
             clamp8(deadband),
-            0
+            clamp8(min_pwm),
         ])
         self.send_frame(data, board_id)

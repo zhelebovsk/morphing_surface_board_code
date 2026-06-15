@@ -7,7 +7,8 @@ BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
 BOARD_COUNT = 30
 MOTORS_PER_BOARD = 14
 
-MIN_LIMITS_FILE = "cantest/motor_min.csv"
+from pathlib import Path
+MIN_LIMITS_FILE = str(Path(__file__).parent / "motor_min.csv")
 
 DEFAULT_MIN_LIMIT = 100
 MOTOR_RANGE = 40

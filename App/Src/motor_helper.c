@@ -1,5 +1,6 @@
 #include "motor_helper.h"
 #include "timer_helper.h"
+#include "can_helper.h"
 
 #define INIT_SAMPLES 1000
 
@@ -12,6 +13,7 @@ float Kd = 0.0f;
 uint8_t u_limit = 100;
 uint8_t deadband = 10;
 float alpha = 0.2f;
+uint8_t min_pwm = 50;
 
 float integral[MOTOR_AMOUNT] = {0};
 float prev_error[MOTOR_AMOUNT] = {0};
@@ -117,7 +119,7 @@ void filter_potentiometer_values(void) {
 void update_potentiometer_values(void) {
 	// The highest sample rate is 30kS/s for ADC1
 	pot_timer_us = get_time_us();
-  fetch_potentiometer_values();
+    fetch_potentiometer_values();
 	filter_potentiometer_values();
 }
 
@@ -197,23 +199,27 @@ void fix_motor_speeds(){
     u = -u;
     if (u > u_limit) u = u_limit;
     if (u < -u_limit) u = -u_limit;
+    if (u > 0 && u < min_pwm) u = min_pwm;
+    if (u < 0 && u > -min_pwm) u = -min_pwm;
 
     motor_speeds[i] = (int16_t)u;
     set_motor(i, motor_speeds[i]);
   }
+  CAN_Stream_Update();
 }
 
 
-void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim, uint8_t db) {
-  Kp = (float)kp / 255.0f; // Scale Kp to [0, 1]
-  Ki = (float)ki / 255.0f; // Scale Ki to [0, 1]
-  Kd = (float)kd / 255.0f; // Scale Kd to [0, 1]
-  alpha = (float)a / 255.0f; // Scale alpha to [0, 1]
+void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim, uint8_t db, uint8_t min_p) {
+  Kp = (float)kp / 255.0f;
+  Ki = (float)ki / 255.0f;
+  Kd = (float)kd / 255.0f;
+  alpha = (float)a / 255.0f;
   if (alpha < 0.1f) alpha = 0.1f; // at 10k hrz , adc gives real freq  160
   if (alpha > 0.8f) alpha = 0.8f; // at 10k hrz , adc gives real freq  1280
 
   u_limit = u_lim;
   deadband = db;
+  min_pwm = min_p;
 }
 
 // void motors_location_set(uint16_t* locations) {
