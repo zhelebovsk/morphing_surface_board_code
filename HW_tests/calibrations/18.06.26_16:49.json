@@ -1,0 +1,231 @@
+{
+  "timestamp": "18.06.26_16:49",
+  "params": {
+    "channel": "can0",
+    "step_size_adc": 60,
+    "movement_thresh": 10,
+    "step_timeout_s": 2.0,
+    "settle_s": 1.5,
+    "min_pwm_low": 20,
+    "min_pwm_high": 90,
+    "min_pwm_step": 10,
+    "calib_kp": 51,
+    "calib_ki": 0,
+    "calib_kd": 0,
+    "calib_alpha": 51,
+    "calib_u_limit": 60,
+    "calib_deadband": 10
+  },
+  "boards": {
+    "1": {
+      "recommended_min_pwm": 40,
+      "motors": {
+        "2": {
+          "min_pwm": 70,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -10.2,
+          "overshoot": -70.2,
+          "suspicious": true
+        },
+        "3": {
+          "min_pwm": 20,
+          "tau_ms": 15008.0,
+          "step_delta": -60,
+          "actual_step": -20.2,
+          "overshoot": 39.8,
+          "suspicious": true
+        },
+        "4": {
+          "min_pwm": 20,
+          "tau_ms": 20716.3,
+          "step_delta": 60,
+          "actual_step": -15.0,
+          "overshoot": -75.0,
+          "suspicious": true
+        },
+        "5": null,
+        "6": {
+          "min_pwm": 20,
+          "tau_ms": 15398.0,
+          "step_delta": 60,
+          "actual_step": -17.4,
+          "overshoot": -77.4,
+          "suspicious": true
+        },
+        "7": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -13.8,
+          "overshoot": 46.2,
+          "suspicious": true
+        },
+        "8": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -12.8,
+          "overshoot": -72.8,
+          "suspicious": true
+        },
+        "9": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -16.0,
+          "overshoot": 44.0,
+          "suspicious": true
+        },
+        "10": null,
+        "11": null,
+        "12": {
+          "min_pwm": 20,
+          "tau_ms": 86.4,
+          "step_delta": 60,
+          "actual_step": 48.4,
+          "overshoot": -11.6
+        },
+        "13": {
+          "min_pwm": 40,
+          "tau_ms": 848.8,
+          "step_delta": -60,
+          "actual_step": -53.3,
+          "overshoot": 6.7
+        },
+        "14": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -22.0,
+          "overshoot": -82.0,
+          "suspicious": true
+        },
+        "15": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -16.0,
+          "overshoot": 44.0,
+          "suspicious": true
+        }
+      }
+    },
+    "2": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "3": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "4": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "5": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "6": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "7": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "8": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "9": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "10": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "11": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "12": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "13": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "14": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "15": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "16": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "17": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "18": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "19": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "20": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "21": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "22": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "23": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "24": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "25": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "26": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "27": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "28": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "29": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    },
+    "30": {
+      "recommended_min_pwm": null,
+      "motors": {}
+    }
+  }
+}
