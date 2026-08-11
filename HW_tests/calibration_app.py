@@ -41,8 +41,11 @@ STREAM_MS     = 10                   # 100 Hz CAN streaming
 
 CALIBRATION_DIR = os.path.join(os.path.dirname(__file__), "calibrations")
 
-# Sent to each board after calibration to restore normal running config
-_RUNNING_CONFIG = [51, 26, 0, 51, 100, 10]  # Kp Ki Kd alpha u_limit deadband
+# Sent to each board after calibration to restore normal running config.
+# Keep in sync with the "Board config packet" slider defaults in
+# cantest/gui/main_window.py — these two are not currently loaded from a
+# shared source, so a change to one won't automatically apply to the other.
+_RUNNING_CONFIG = [51, 26, 0, 51, 65, 10]  # Kp Ki Kd alpha u_limit deadband
 
 # Result sanity: if a motor moved this many times more than commanded,
 # it is flagged as suspicious (likely not physically connected)
@@ -161,6 +164,56 @@ def _read_motor_positions(bus, can_id):
         ))
         time.sleep(0.02)
     return pots
+
+
+def _sweep_to_edge(bus, can_id, motor_id, park_vals, active_idx, start_pos, direction,
+                    step_size, movement_thresh, step_timeout_s, settle_s,
+                    max_steps, abort_check):
+    """Walk outward from start_pos in `direction` (+1/-1) in step_size
+    increments until movement stalls (near a mechanical limit / stiction
+    wall) or a hard backstop is hit. Never commands past LO_LIMIT/HI_LIMIT
+    regardless of what the stall check does, and always returns the motor
+    to start_pos afterward rather than parking at the point of max
+    resistance. Returns (edge_position, reason); reason is one of
+    'stalled', 'hard_limit', 'max_steps', 'aborted'.
+    """
+    current = start_pos
+    reason = "max_steps"
+
+    for _ in range(max_steps):
+        if abort_check():
+            reason = "aborted"
+            break
+
+        target_adc = current + direction * step_size
+        if not (LO_LIMIT <= target_adc <= HI_LIMIT):
+            reason = "hard_limit"
+            break
+
+        target_can = _pot_to_can(target_adc)
+        d1, d2 = _build_frames(park_vals, active_idx, target_can)
+        bus.send(can.Message(arbitration_id=can_id, data=d1, is_extended_id=False))
+        bus.send(can.Message(arbitration_id=can_id, data=d2, is_extended_id=False))
+
+        raws, _times = _record_step(bus, can_id, motor_id, step_timeout_s)
+        moved = _movement(raws, current)
+
+        if moved < movement_thresh:
+            reason = "stalled"
+            break
+
+        current += direction * moved
+
+    # Return to rest rather than parking near the edge — simpler and safer
+    # than trying to back off "one step", and matches how the min_pwm
+    # search already resets between attempts.
+    rc = _pot_to_can(start_pos)
+    r1, r2 = _build_frames(park_vals, active_idx, rc)
+    bus.send(can.Message(arbitration_id=can_id, data=r1, is_extended_id=False))
+    bus.send(can.Message(arbitration_id=can_id, data=r2, is_extended_id=False))
+    time.sleep(settle_s)
+
+    return round(current), reason
 
 
 def _is_sane(result, step_size):
@@ -317,6 +370,7 @@ class CalibrationWorker(QThread):
             ))
 
             if best:
+                best["zero"] = pot  # already known — the rest position read at connect time
                 _send_config(bus, can_id, kp, ki, kd, alpha, u_limit, deadband, best["min_pwm"])
                 rc = _pot_to_can(pot)
                 r1, r2 = _build_frames(park_vals, active_idx, rc)
@@ -331,6 +385,41 @@ class CalibrationWorker(QThread):
                         f"  !! Suspicious — moved {abs(best['actual_step']):.0f} ADC "
                         f"for a {step_size}-count step. Motor may not be connected."
                     )
+                elif p.get("find_range") and not self._abort:
+                    max_steps = max(1, int((HI_LIMIT - LO_LIMIT) / step_size) + 5)
+                    bus.send(can.Message(
+                        arbitration_id=can_id,
+                        data=bytes([0x04, motor_id, STREAM_MS, 0, 0, 0, 0, 0]),
+                        is_extended_id=False,
+                    ))
+                    time.sleep(0.05)
+
+                    self.motor_status.emit(active_idx, "testing (range+)")
+                    safe_max, reason_hi = _sweep_to_edge(
+                        bus, can_id, motor_id, park_vals, active_idx, pot, +1,
+                        step_size, p["movement_thresh"], p["step_timeout_s"],
+                        p["settle_s"], max_steps, lambda: self._abort,
+                    )
+                    self.log.emit(f"  range+  edge={safe_max}  ({reason_hi})")
+
+                    self.motor_status.emit(active_idx, "testing (range-)")
+                    safe_min, reason_lo = _sweep_to_edge(
+                        bus, can_id, motor_id, park_vals, active_idx, pot, -1,
+                        step_size, p["movement_thresh"], p["step_timeout_s"],
+                        p["settle_s"], max_steps, lambda: self._abort,
+                    )
+                    self.log.emit(f"  range-  edge={safe_min}  ({reason_lo})")
+
+                    bus.send(can.Message(
+                        arbitration_id=can_id,
+                        data=bytes([0x05, 0, 0, 0, 0, 0, 0, 0]),
+                        is_extended_id=False,
+                    ))
+
+                    best["safe_min"]     = safe_min
+                    best["safe_max"]     = safe_max
+                    best["range_reason"] = f"{reason_lo}/{reason_hi}"
+
                 results[active_idx] = best
                 self.motor_result.emit(active_idx, best)
                 self.motor_status.emit(active_idx, "done" if sane else "suspicious")
@@ -347,8 +436,9 @@ class CalibrationWorker(QThread):
 
 # ── Per-board results tab ─────────────────────────────────────────────────────
 
-_NCOLS = 6
-_COL_MOTOR, _COL_STATUS, _COL_MIN_PWM, _COL_TAU, _COL_OVERSHOOT, _COL_STEP = range(_NCOLS)
+_NCOLS = 9
+(_COL_MOTOR, _COL_STATUS, _COL_MIN_PWM, _COL_TAU, _COL_OVERSHOOT, _COL_STEP,
+ _COL_ZERO, _COL_SAFE_MIN, _COL_SAFE_MAX) = range(_NCOLS)
 
 _STATUS_COLOR = {
     "waiting":       ("#e8e8e8", "#888888"),
@@ -380,7 +470,8 @@ class BoardResultsTab(QWidget):
 
         self._table = QTableWidget(len(ACTIVE_MOTORS), _NCOLS)
         self._table.setHorizontalHeaderLabels(
-            ["Motor", "Status", "min_pwm", "τ (ms)", "Overshoot (ADC)", "Actual step (ADC)"]
+            ["Motor", "Status", "min_pwm", "τ (ms)", "Overshoot (ADC)", "Actual step (ADC)",
+             "Zero (ADC)", "Safe min (ADC)", "Safe max (ADC)"]
         )
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -389,7 +480,8 @@ class BoardResultsTab(QWidget):
         for i in range(len(ACTIVE_MOTORS)):
             self._set_cell(i, _COL_MOTOR, f"M{ACTIVE_MOTORS[i] + 1}")
             self._set_cell(i, _COL_STATUS, "waiting", "waiting")
-            for col in (_COL_MIN_PWM, _COL_TAU, _COL_OVERSHOOT, _COL_STEP):
+            for col in (_COL_MIN_PWM, _COL_TAU, _COL_OVERSHOOT, _COL_STEP,
+                        _COL_ZERO, _COL_SAFE_MIN, _COL_SAFE_MAX):
                 self._set_cell(i, col, "—")
 
         layout.addWidget(self._table)
@@ -410,6 +502,11 @@ class BoardResultsTab(QWidget):
         self._set_cell(active_idx, _COL_TAU, f"{tau:.0f}" if tau else "—")
         self._set_cell(active_idx, _COL_OVERSHOOT, f"{result['overshoot']:+.1f}")
         self._set_cell(active_idx, _COL_STEP, f"{result['actual_step']:+.1f}")
+        if "zero" in result:
+            self._set_cell(active_idx, _COL_ZERO, result["zero"])
+        if "safe_min" in result:
+            self._set_cell(active_idx, _COL_SAFE_MIN, f"{result['safe_min']} ({result['range_reason'].split('/')[0]})")
+            self._set_cell(active_idx, _COL_SAFE_MAX, f"{result['safe_max']} ({result['range_reason'].split('/')[1]})")
 
     def set_footer(self, text):
         self._footer.setText(text)
@@ -652,6 +749,14 @@ class CalibrationApp(QMainWindow):
         f1.addRow("Movement thresh (ADC):", self._move_thresh)
         f1.addRow("Step timeout (s):",     self._step_timeout)
         f1.addRow("Settle time (s):",      self._settle_s)
+        self._find_range = QCheckBox("Find safe min/max range")
+        self._find_range.setToolTip(
+            "Walks each motor outward in both directions (using the step size/\n"
+            "thresholds above) until movement stalls near a mechanical limit.\n"
+            "Adds real time per motor — off by default. Skipped for any motor\n"
+            "flagged suspicious by the stiction search."
+        )
+        f1.addRow("", self._find_range)
         layout.addWidget(mt)
 
         # PWM search
@@ -784,6 +889,7 @@ class CalibrationApp(QMainWindow):
             "calib_alpha":     self._calib_alpha.value(),
             "calib_u_limit":   self._calib_u_limit.value(),
             "calib_deadband":  self._calib_deadband.value(),
+            "find_range":      self._find_range.isChecked(),
         }
 
     def _start(self):
@@ -881,7 +987,14 @@ class CalibrationApp(QMainWindow):
         path  = os.path.join(CALIBRATION_DIR, fname)
         with open(path, "w") as f:
             json.dump(out, f, indent=2)
-        self._log.append(f"Saved → calibrations/{fname}")
+
+        # cantest reads only this stable filename — the timestamped file
+        # above is kept purely as a history/audit trail.
+        latest_path = os.path.join(CALIBRATION_DIR, "latest.json")
+        with open(latest_path, "w") as f:
+            json.dump(out, f, indent=2)
+
+        self._log.append(f"Saved → calibrations/{fname} (and latest.json)")
 
     def _send_to_board(self, board_id, recommended_min_pwm):
         try:

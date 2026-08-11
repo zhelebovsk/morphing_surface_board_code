@@ -1,7 +1,11 @@
 import os
 import csv
-from config import BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT, MOTOR_RANGE
-from utils import clamp8    
+import json
+from config import (
+    BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT, MOTOR_RANGE,
+    CALIBRATION_FILE, DEFAULT_MIN_PWM,
+)
+from utils import clamp8
 
 def create_default_limit_file(path, default_value):
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -46,10 +50,40 @@ def save_limit_file(path, limits):
             writer.writerow([board_index + 1] + [clamp8(v) for v in row])
 
 
+def load_min_pwm(path, board_count, default):
+    """min_pwm is a per-board value in the firmware protocol (set_controller
+    applies it to every motor on a board), so unlike the position limits this
+    is a flat list, not per-motor. Written by HW_tests/calibration_app.py."""
+    pwm_by_board = [default] * board_count
+
+    if not os.path.exists(path):
+        return pwm_by_board
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return pwm_by_board
+
+    for board_str, board_data in data.get("boards", {}).items():
+        try:
+            board_index = int(board_str) - 1
+        except ValueError:
+            continue
+        if not (0 <= board_index < board_count):
+            continue
+        value = board_data.get("recommended_min_pwm")
+        if value is not None:
+            pwm_by_board[board_index] = value
+
+    return pwm_by_board
+
+
 def load_all_limits():
     min_limits = load_limit_file(MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT)
     max_limits = [
         [min(min_limits[board][motor] + MOTOR_RANGE, 255) for motor in range(MOTORS_PER_BOARD)]
         for board in range(BOARD_COUNT)
     ]
-    return min_limits, max_limits
+    min_pwm_by_board = load_min_pwm(CALIBRATION_FILE, BOARD_COUNT, DEFAULT_MIN_PWM)
+    return min_limits, max_limits, min_pwm_by_board

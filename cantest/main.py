@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     if setup.started:
         channel = setup.get_channel()
-        min_limits, _ = load_all_limits()
+        min_limits, _, _ = load_all_limits()
 
         motor = ControlMotor(
             channel=channel,
@@ -20,6 +20,15 @@ if __name__ == "__main__":
             board_count=BOARD_COUNT,
             motors_per_board=MOTORS_PER_BOARD,
         )
+
+        # ControlMotor already scanned during construction (and keeps
+        # rescanning in the background) — no need to scan again here.
+        found = sorted(motor.communication.active_boards)
+        missing = [i for i in range(1, BOARD_COUNT + 1) if i not in found]
+        if missing:
+            print(f"WARNING: {len(missing)} board(s) not responding: {missing}")
+        else:
+            print(f"All {BOARD_COUNT} boards responding.")
 
         app = MainWindow(motor)
         app.start()

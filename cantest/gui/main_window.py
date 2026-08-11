@@ -9,8 +9,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PySide6.QtGui import QColor, QPalette
 
+import os
+
 from config import BOARD_SPACING_MM, MOTOR_SPACING_MM
-from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE
+from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE, CALIBRATION_FILE
 from gui.calib_window import CalibrationWindow
 
 
@@ -71,8 +73,14 @@ class MainWindow:
         self._timer.setInterval(20)
         self._timer.timeout.connect(self._poll_everything)
 
-        self._file_watcher = QFileSystemWatcher([MIN_LIMITS_FILE])
+        watched_files = [MIN_LIMITS_FILE]
+        if os.path.exists(CALIBRATION_FILE):
+            watched_files.append(CALIBRATION_FILE)
+        self._file_watcher = QFileSystemWatcher(watched_files)
         self._file_watcher.fileChanged.connect(self._on_limits_file_changed)
+        # If calibration hasn't been run yet, CALIBRATION_FILE doesn't exist
+        # and QFileSystemWatcher can't watch a path with no file at it — use
+        # "Reload limits" after the first calibration run in that case.
 
     # ── left panel ────────────────────────────────────────────────────────────
 
@@ -328,7 +336,7 @@ class MainWindow:
         self._ki = self._add_slider(sliders_layout, "Ki", default=26)
         self._kd = self._add_slider(sliders_layout, "Kd", default=0)
         self._alpha = self._add_slider(sliders_layout, "Alpha", default=51)
-        self._limit_signal = self._add_slider(sliders_layout, "Limit signal", default=100)
+        self._limit_signal = self._add_slider(sliders_layout, "Limit signal", default=65)
         self._deadband = self._add_slider(sliders_layout, "Deadband", default=10)
         bar_layout.addWidget(sliders_widget)
 

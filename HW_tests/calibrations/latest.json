@@ -1,0 +1,87 @@
+{
+  "timestamp": "11.08.26_13:40",
+  "params": {
+    "channel": "can0",
+    "step_size_adc": 60,
+    "movement_thresh": 10,
+    "step_timeout_s": 2.0,
+    "settle_s": 1.5,
+    "min_pwm_low": 20,
+    "min_pwm_high": 90,
+    "min_pwm_step": 10,
+    "calib_kp": 51,
+    "calib_ki": 0,
+    "calib_kd": 0,
+    "calib_alpha": 51,
+    "calib_u_limit": 90,
+    "calib_deadband": 10,
+    "find_range": true
+  },
+  "boards": {
+    "1": {
+      "recommended_min_pwm": 30,
+      "motors": {
+        "2": null,
+        "3": {
+          "min_pwm": 20,
+          "tau_ms": 15721.8,
+          "step_delta": -60,
+          "actual_step": -34.5,
+          "overshoot": 25.5,
+          "zero": 3264,
+          "safe_min": 3229,
+          "safe_max": 3362,
+          "range_reason": "stalled/hard_limit"
+        },
+        "4": null,
+        "5": {
+          "min_pwm": 30,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": 15.7,
+          "overshoot": 75.7,
+          "zero": 3007,
+          "suspicious": true
+        },
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null,
+        "11": null,
+        "12": {
+          "min_pwm": 30,
+          "tau_ms": 1721.9,
+          "step_delta": 60,
+          "actual_step": 56.5,
+          "overshoot": -3.5,
+          "zero": 2271,
+          "safe_min": 1055,
+          "safe_max": 2830,
+          "range_reason": "stalled/stalled"
+        },
+        "13": {
+          "min_pwm": 30,
+          "tau_ms": 1664.6,
+          "step_delta": -60,
+          "actual_step": -29.8,
+          "overshoot": 30.2,
+          "zero": 2231,
+          "safe_min": 2202,
+          "safe_max": 2827,
+          "range_reason": "stalled/stalled"
+        },
+        "14": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": 15.4,
+          "overshoot": 75.4,
+          "zero": 3375,
+          "suspicious": true
+        },
+        "15": null
+      }
+    }
+  }
+}
