@@ -20,6 +20,12 @@ float prev_error[MOTOR_AMOUNT] = {0};
 
 volatile uint32_t conv_counter[2] = {0, 0};
 volatile uint8_t conv_complete[2] = {0, 0};
+volatile uint32_t adc_timeout_count = 0;
+
+// If a DMA conversion-complete IRQ is ever missed (overrun, DMA stall),
+// waiting for it unconditionally hangs the whole board forever -- bound
+// the wait and recover instead.
+#define ADC_CONV_TIMEOUT_US 2000
 uint16_t buffer_adc1[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint16_t buffer_adc2[3] = {0, 0, 0};
 const uint8_t adc_index_map[16] = {4,9,11,15,10,12,14,13,3,2,1,0,8,7,6,5};
@@ -96,7 +102,16 @@ void fetch_potentiometer_values(void) {
   conv_complete[1] = 0;
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)buffer_adc1, hadc1.Init.NbrOfConversion);
   HAL_ADC_Start_DMA(&hadc2, (uint32_t*)buffer_adc2, hadc2.Init.NbrOfConversion);
-  while (!conv_complete[0] || !conv_complete[1]) {}
+
+  uint32_t wait_start = get_time_us();
+  while (!conv_complete[0] || !conv_complete[1]) {
+    if (get_time_us() - wait_start > ADC_CONV_TIMEOUT_US) {
+      HAL_ADC_Stop_DMA(&hadc1);
+      HAL_ADC_Stop_DMA(&hadc2);
+      adc_timeout_count++;
+      return;  // pot_raw keeps its last good values for this cycle
+    }
+  }
   conv_counter[0]++;
   uint16_t buffer[MOTOR_AMOUNT];
   for (int i = 0; i < hadc1.Init.NbrOfConversion; i++) {
