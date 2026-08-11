@@ -25,6 +25,10 @@ class ControlMotor:
             offset=0
         )
         self.communication = MotorCommunication(channel, min_limits)
+        self.communication.scan_boards(board_count)
+
+        from limits import load_all_limits
+        _, _, self.min_pwm_by_board = load_all_limits()
 
         self.running = False
         self.step_index = 0
@@ -32,6 +36,16 @@ class ControlMotor:
 
         self._thread = None
         self._lock = threading.Lock()
+
+        self._last_warning_time = time.perf_counter()
+        self._overbudget_count = 0
+
+        # Presence isn't just checked once at startup: boards can drop off or
+        # come back over a long run, so keep re-checking in the background at
+        # the full 30-board scale instead of trusting a single boot-time scan.
+        self._monitor_running = True
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._monitor_thread.start()
 
         # dynamic-only state
         self.dynamic_t = 0.0
@@ -88,10 +102,17 @@ class ControlMotor:
             send_ms = (time.perf_counter() - t0) * 1000.0
 
             if send_ms > self.UPDATE_DT * 1000.0:
-                print(
-                    f"\033[91mWARNING: send_positions took {send_ms:.1f} ms, "
-                    f"exceeds cycle period {self.UPDATE_DT * 1000.0:.1f} ms\033[0m"
-                )
+                self._overbudget_count += 1
+                now = time.perf_counter()
+                if now - self._last_warning_time > 1.0:
+                    print(
+                        f"\033[91mWARNING: send_positions took {send_ms:.1f} ms, "
+                        f"exceeds cycle period {self.UPDATE_DT * 1000.0:.1f} ms "
+                        f"({self._overbudget_count} time(s) in the last "
+                        f"{now - self._last_warning_time:.1f}s)\033[0m"
+                    )
+                    self._last_warning_time = now
+                    self._overbudget_count = 0
 
             self._frame_queue.put([row[:] for row in locations])
 
@@ -103,6 +124,27 @@ class ControlMotor:
             sleep_for = next_time - time.perf_counter()
             if sleep_for > 0:
                 time.sleep(sleep_for)
+
+    def _monitor_loop(self, interval=1.0, max_interval=10.0):
+        current_interval = interval
+        while self._monitor_running:
+            try:
+                self.communication.poll_presence(self.board_count)
+                # Nothing answered at all -> the bus itself is likely down
+                # (unterminated/disconnected), not just one flaky board.
+                # Back off instead of hammering a dead bus every second.
+                if self.communication.active_boards:
+                    current_interval = interval
+                else:
+                    current_interval = min(current_interval * 2, max_interval)
+            except Exception as e:
+                print(f"presence check failed: {e}")
+                current_interval = min(current_interval * 2, max_interval)
+            time.sleep(current_interval)
+
+    def shutdown(self):
+        self.running = False
+        self._monitor_running = False
 
     def stop_dynamic(self):
         self.running = False
@@ -146,11 +188,15 @@ class ControlMotor:
 
     def reload_limits(self):
         from limits import load_all_limits
-        min_limits, _ = load_all_limits()
+        min_limits, _, min_pwm_by_board = load_all_limits()
         self.communication.min_limits = min_limits
+        self.min_pwm_by_board = min_pwm_by_board
 
-    def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband, min_pwm=20):
+    def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband, min_pwm=None):
+        # min_pwm=None (the default) means "use each board's own calibrated
+        # value from HW_tests" instead of forcing one number on every board.
         for board_id in board_ids:
+            pwm = min_pwm if min_pwm is not None else self.min_pwm_by_board[board_id - 1]
             self.communication.send_board_config(
-                board_id, kp, ki, kd, alpha, limit_signal, deadband, min_pwm
+                board_id, kp, ki, kd, alpha, limit_signal, deadband, pwm
             )
