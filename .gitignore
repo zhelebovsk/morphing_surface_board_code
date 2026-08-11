@@ -56,3 +56,10 @@ __pycache__/
 *.pyc
 *.log
 
+# Local safety-net backups, not source
+backups/
+
+# Calibration run history: keep only the stable "latest" pointer
+HW_tests/calibrations/*.json
+!HW_tests/calibrations/latest.json
+

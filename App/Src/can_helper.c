@@ -83,7 +83,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     if (data[0] == 0x5) {
       stream_enabled = 0;
     }
-    // if (data[0] == 0x4) { 
+    if (data[0] == 0x6) {
+      uint8_t pong[2] = {0xA1, (uint8_t)(board_id & 0xFF)};
+      CAN_Send(board_id, pong, FDCAN_DLC_BYTES_2);
+    }
+    // if (data[0] == 0x4) {
     //   motor_power_setup(data[1]);
     // }
 //     if (data[0] == 0x5) { 

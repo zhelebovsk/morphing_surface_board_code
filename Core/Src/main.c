@@ -116,16 +116,15 @@ int main(void)
   MX_TIM20_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+  board_id = Read_Board_ID();
   HAL_FDCAN_Start(&hfdcan1);
   HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, ENABLE);
   Calibrate_ADC();
   HAL_TIM_Base_Start(&htim2);
-  
+
   start_potentiometer_limits();
   motor_power_setup(1);
   motor_pwm_timers_start();
-
-  board_id = Read_Board_ID(); // Initialize global board ID variable
   
   /* USER CODE END 2 */
 
