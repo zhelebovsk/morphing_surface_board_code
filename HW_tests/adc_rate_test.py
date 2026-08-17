@@ -14,7 +14,7 @@ Requirements:
   - Firmware running on the board
 
 Usage:
-  python3 adc_rate_test.py
+  cd HW_tests && python3 adc_rate_test.py
 """
 
 import json
@@ -27,14 +27,14 @@ from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-ELF_PATH = "build/STM32_code.elf"
+ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "build", "STM32_code.elf")
 
 OPENOCD_CFG_FILES = ["interface/stlink.cfg", "target/stm32g4x.cfg"]
 OPENOCD_HOST = "localhost"
 OPENOCD_TELNET_PORT = 4444
 
 MEASURE_DURATION_SEC = 2.0
-OUTPUT_FILE = "adc_rate_results.json"
+OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "adc_rate_results.json")
 
 # ── Theoretical calculation ───────────────────────────────────────────────────
 # From adc.c and SystemClock_Config in main.c:
