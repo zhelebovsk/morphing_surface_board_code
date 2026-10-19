@@ -1,9 +1,52 @@
 import can
 import time
 import threading
+import re
+import subprocess
 from config import REFACTORING, MOTOR_RANGE
 from utils import clamp8
 import os
+
+
+def read_can_state(channel):
+    """The interface state as the kernel sees it — "ERROR-ACTIVE", "BUS-OFF",
+    "STOPPED", etc. — or None if it can't be determined.
+
+    python-can's `bus.state` is no use here: the socketcan backend doesn't
+    override `BusABC.state`, which unconditionally returns ACTIVE whatever the
+    hardware is actually doing. `ip -details link show` is the real answer and
+    needs no extra dependency.
+    """
+    if not channel or channel == "DEMO-MODE":
+        return None
+    try:
+        out = subprocess.run(
+            ["ip", "-details", "link", "show", channel],
+            capture_output=True, text=True, timeout=1.0,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    match = re.search(r"can state (\S+)", out)
+    return match.group(1) if match else None
+
+
+def read_tx_packets(channel):
+    """Frames the interface has successfully transmitted, or None if unknown.
+
+    A CAN frame only completes (and only counts here) once some node ACKs it,
+    so if this doesn't advance across a burst, nothing on the bus is
+    acknowledging. Unlike the reported state, this can't go stale: the Kvaser
+    driver keeps reporting BUS-OFF after a restart-ms recovery even while
+    frames are flowing again (seen on the bench 2026-10-19).
+    """
+    if not channel or channel == "DEMO-MODE":
+        return None
+    try:
+        with open(f"/sys/class/net/{channel}/statistics/tx_packets") as f:
+            return int(f.read())
+    except (OSError, ValueError):
+        return None
+
 
 def can_search():
     channels = ["DEMO-MODE"]
@@ -18,6 +61,7 @@ def can_search():
 class MotorCommunication:
     def __init__(self, channel, min_limits):
         self.bus = None
+        self.channel = channel
         self.demo = (channel == "DEMO-MODE")
         self.min_limits = min_limits
 
@@ -68,8 +112,60 @@ class MotorCommunication:
                     f"CAN send failed ({self._send_fail_count} time(s) in the "
                     f"last {now - self._last_fail_warning_time:.1f}s): {e}"
                 )
+                hint = self.bus_state_hint()
+                if hint:
+                    print(hint)
                 self._last_fail_warning_time = now
                 self._send_fail_count = 0
+
+    def bus_state_hint(self):
+        """Turn the kernel's view of the interface into something actionable.
+
+        A bare CanError repr doesn't distinguish "one board is unplugged" from
+        "nothing on this bus can acknowledge anything", and that is the only
+        distinction that matters. CAN acknowledgement is not addressed: every
+        healthy node ACKs every frame it receives correctly, so a frame aimed
+        at an absent board still succeeds as long as one other board is alive.
+
+        If NO node can ACK, the controller retransmits forever and climbs to
+        ERROR-PASSIVE, then stops there: ISO 11898 exempts ACK errors from
+        further TEC increments once error-passive. So "nothing answering"
+        plateaus at ERROR-PASSIVE; reaching BUS-OFF takes real bit errors
+        (bitrate mismatch, wiring fault, a node corrupting frames).
+        """
+        state = read_can_state(self.channel)
+        if state is None:
+            return None
+        # Caveat: the Kvaser driver can keep reporting BUS-OFF after a
+        # restart-ms recovery while frames flow normally — a hint, not proof.
+        if state in ("BUS-OFF", "STOPPED"):
+            return (
+                f"  {self.channel} is {state}: frames are being corrupted on the wire,\n"
+                f"  not just going unanswered. Check: bitrate 1 Mbit on both ends?\n"
+                f"  wiring/connectors? a board resetting or powering up mid-traffic?"
+            )
+        if state == "ERROR-PASSIVE":
+            return (
+                f"  {self.channel} is ERROR-PASSIVE: if no board is answering, nothing\n"
+                f"  on the bus is acknowledging frames — this is not one missing\n"
+                f"  board. Check: boards powered? bus plugged in? bitrate 1 Mbit?"
+            )
+        if state == "ERROR-WARNING":
+            return (
+                f"  {self.channel} is ERROR-WARNING: errors are accumulating and the\n"
+                f"  bus is marginal. Check wiring and termination."
+            )
+        return f"  {self.channel} state: {state}"
+
+    @staticmethod
+    def _batched(items, size):
+        """Split `items` into lists of at most `size` (size <= 0 — one batch)."""
+        items = list(items)
+        if size <= 0:
+            yield items
+            return
+        for start in range(0, len(items), size):
+            yield items[start:start + size]
 
     def _drain_rx(self):
         """Discard anything already queued on the socket (stale pongs, leftover
@@ -102,11 +198,25 @@ class MotorCommunication:
                         remaining_targets.discard(responder)
         return found
 
-    def scan_boards(self, board_count, timeout=0.3, retries=1):
+    def scan_boards(self, board_count, timeout=0.15, retries=1, batch_size=5):
         """Ping every board and return the ones that answer. A single dropped
         ping or pong shouldn't permanently brand a live board as missing, so
         boards that don't answer the first round get a couple more tries —
-        only the still-missing ones are re-pinged, not the whole bus."""
+        only the still-missing ones are re-pinged, not the whole bus.
+
+        Pings go out `batch_size` at a time with a listen window after each,
+        rather than all 30 back-to-back, so a bus where nothing can ACK isn't
+        handed a large burst to retransmit. If a batch gets no pong and not one
+        of its pings was ACKed (the interface's TX counter didn't move), the
+        scan stops there with a reason instead of grinding through every
+        remaining batch.
+
+        `timeout` is the listen window per batch, not for the whole scan, so
+        the worst case (bus up, nothing answering) is
+        ceil(board_count/batch_size) * (retries+1) * timeout — 1.8 s at the
+        defaults for 30 boards. A pong round-trip is well under a millisecond,
+        so 0.15 s per 5 boards is already ~150x margin; a healthy fleet
+        returns as soon as the last board in each batch replies."""
         if self.demo:
             print("DEMO: assuming all boards present")
             self.active_boards = set(range(1, board_count + 1))
@@ -122,19 +232,37 @@ class MotorCommunication:
         for attempt in range(retries + 1):
             if not pending:
                 break
-            for board_id in sorted(pending):
-                self.send_frame(bytes([0x06]), board_id)
+            for batch in self._batched(sorted(pending), batch_size):
+                tx_before = read_tx_packets(self.channel)
+                for board_id in batch:
+                    self.send_frame(bytes([0x06]), board_id)
 
-            replied = self._listen_for_pongs(pending, timeout)
-            found |= replied
-            pending -= replied
+                replied = self._listen_for_pongs(set(batch), timeout)
+                found |= replied
+                pending -= replied
+
+                # No pong and not one ping ACKed -> nothing on the bus is
+                # alive. Judged by the TX counter, not the reported state,
+                # which goes stale after a restart-ms recovery on this Kvaser.
+                if not found and tx_before is not None \
+                        and read_tx_packets(self.channel) == tx_before:
+                    print(f"Scan stopped: no board answered and none of the "
+                          f"pings on {self.channel} were acknowledged.")
+                    print("  Nothing on the bus is acknowledging frames — this is not\n"
+                          "  one missing board. Check: boards powered? bus plugged in?\n"
+                          "  bitrate 1 Mbit?")
+                    self.active_boards = set()
+                    self._miss_counts = {}
+                    self._scanned = True
+                    return []
 
         self.active_boards = found
         self._miss_counts = {board_id: 0 for board_id in found}
         self._scanned = True
         return sorted(found)
 
-    def poll_presence(self, board_count, subset_size=5, timeout=0.15, miss_threshold=3):
+    def poll_presence(self, board_count, subset_size=5, timeout=0.15, miss_threshold=3,
+                      batch_size=5):
         """Lightweight incremental presence check meant to run periodically in
         the background (see engine.py). Every call re-pings all currently
         missing boards (cheap — usually few or none) plus a rotating slice of
@@ -163,10 +291,15 @@ class MotorCommunication:
 
         with self._bus_lock:
             self._drain_rx()
-        for board_id in sorted(targets):
-            self.send_frame(bytes([0x06]), board_id)
 
-        replied = self._listen_for_pongs(targets, timeout)
+        # Batched for the same reason as scan_boards: when every board is
+        # missing, `targets` is the whole fleet and sending it as one burst is
+        # exactly the pattern that runs the TX error counter to bus-off.
+        replied = set()
+        for batch in self._batched(sorted(targets), batch_size):
+            for board_id in batch:
+                self.send_frame(bytes([0x06]), board_id)
+            replied |= self._listen_for_pongs(set(batch), timeout)
 
         for board_id in targets:
             if board_id in replied:

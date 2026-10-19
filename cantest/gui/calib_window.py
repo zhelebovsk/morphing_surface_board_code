@@ -52,7 +52,7 @@ class CalibrationWindow:
         btn_l.addWidget(close_btn)
         root.addWidget(btn_row)
 
-        min_limits, _ = load_all_limits()
+        min_limits, _, _ = load_all_limits()
         self._load_data(min_limits)
 
     # ── table factory ─────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ class CalibrationWindow:
         self._engine.reload_limits()
 
     def _reload(self):
-        min_limits, _ = load_all_limits()
+        min_limits, _, _ = load_all_limits()
         self._load_data(min_limits)
 
     # ── entry point ───────────────────────────────────────────────────────────
