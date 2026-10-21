@@ -1,5 +1,5 @@
 {
-  "timestamp": "11.08.26_13:40",
+  "timestamp": "28.08.26_12:31",
   "params": {
     "channel": "can0",
     "step_size_adc": 60,
@@ -13,74 +13,128 @@
     "calib_ki": 0,
     "calib_kd": 0,
     "calib_alpha": 51,
-    "calib_u_limit": 90,
+    "calib_u_limit": 60,
     "calib_deadband": 10,
     "find_range": true
   },
   "boards": {
     "1": {
-      "recommended_min_pwm": 30,
+      "recommended_min_pwm": 50,
       "motors": {
-        "2": null,
-        "3": {
+        "2": {
           "min_pwm": 20,
-          "tau_ms": 15721.8,
-          "step_delta": -60,
-          "actual_step": -34.5,
-          "overshoot": 25.5,
-          "zero": 3264,
-          "safe_min": 3229,
-          "safe_max": 3362,
-          "range_reason": "stalled/hard_limit"
-        },
-        "4": null,
-        "5": {
-          "min_pwm": 30,
-          "tau_ms": null,
-          "step_delta": -60,
-          "actual_step": 15.7,
-          "overshoot": 75.7,
-          "zero": 3007,
+          "tau_ms": 16784.3,
+          "step_delta": 60,
+          "actual_step": -20.3,
+          "overshoot": -80.3,
+          "zero": 1749,
           "suspicious": true
         },
-        "6": null,
-        "7": null,
-        "8": null,
+        "3": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -15.1,
+          "overshoot": 44.9,
+          "zero": 1759,
+          "suspicious": true
+        },
+        "4": {
+          "min_pwm": 20,
+          "tau_ms": 13011.2,
+          "step_delta": 60,
+          "actual_step": -17.0,
+          "overshoot": -77.0,
+          "zero": 1727,
+          "suspicious": true
+        },
+        "5": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -16.1,
+          "overshoot": 43.9,
+          "zero": 1631,
+          "suspicious": true
+        },
+        "6": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -13.4,
+          "overshoot": -73.4,
+          "zero": 1615,
+          "suspicious": true
+        },
+        "7": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -12.0,
+          "overshoot": 48.0,
+          "zero": 1387,
+          "suspicious": true
+        },
+        "8": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -15.5,
+          "overshoot": -75.5,
+          "zero": 1223,
+          "suspicious": true
+        },
         "9": null,
-        "10": null,
+        "10": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": 60,
+          "actual_step": -20.3,
+          "overshoot": -80.3,
+          "zero": 1189,
+          "suspicious": true
+        },
         "11": null,
         "12": {
-          "min_pwm": 30,
-          "tau_ms": 1721.9,
+          "min_pwm": 20,
+          "tau_ms": 525.5,
           "step_delta": 60,
-          "actual_step": 56.5,
-          "overshoot": -3.5,
-          "zero": 2271,
-          "safe_min": 1055,
-          "safe_max": 2830,
+          "actual_step": 52.0,
+          "overshoot": -8.0,
+          "zero": 1131,
+          "safe_min": 1094,
+          "safe_max": 1183,
           "range_reason": "stalled/stalled"
         },
         "13": {
-          "min_pwm": 30,
-          "tau_ms": 1664.6,
+          "min_pwm": 50,
+          "tau_ms": 26.3,
           "step_delta": -60,
-          "actual_step": -29.8,
-          "overshoot": 30.2,
-          "zero": 2231,
-          "safe_min": 2202,
-          "safe_max": 2827,
+          "actual_step": -56.0,
+          "overshoot": 4.0,
+          "zero": 1327,
+          "safe_min": 1055,
+          "safe_max": 2831,
           "range_reason": "stalled/stalled"
         },
         "14": {
           "min_pwm": 20,
           "tau_ms": null,
-          "step_delta": -60,
-          "actual_step": 15.4,
-          "overshoot": 75.4,
-          "zero": 3375,
+          "step_delta": 60,
+          "actual_step": -16.0,
+          "overshoot": -76.0,
+          "zero": 1839,
           "suspicious": true
         },
-        "15": null
+        "15": {
+          "min_pwm": 20,
+          "tau_ms": null,
+          "step_delta": -60,
+          "actual_step": -23.8,
+          "overshoot": 36.2,
+          "zero": 1687,
+          "suspicious": true
+        }
       }
     }
   }

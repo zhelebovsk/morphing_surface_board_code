@@ -7,6 +7,24 @@ static uint8_t  stream_motor_id    = 0;
 static uint32_t stream_interval_us = 10000;  // default 100 Hz
 static uint32_t last_stream_us     = 0;
 
+// Controller config (0x03) lives in RAM only, so a reset silently reverts to
+// the defaults in motor_helper.c. Reported in every pong so the host can see
+// a board that needs its config re-sent.
+static uint8_t  config_received    = 0;
+
+volatile uint32_t can_bus_off_recoveries = 0;
+
+// On bus-off the FDCAN sets CCCR.INIT and stays off the bus until software
+// clears it -- without this a board would ignore all commands until
+// power-cycled. Clearing INIT starts the standard recovery (the controller
+// itself waits out 129 x 11 recessive bits before rejoining).
+void CAN_Check_Bus_Off(void) {
+    if (READ_BIT(hfdcan1.Instance->CCCR, FDCAN_CCCR_INIT)) {
+        CLEAR_BIT(hfdcan1.Instance->CCCR, FDCAN_CCCR_INIT);
+        can_bus_off_recoveries++;
+    }
+}
+
 void CAN_Stream_Update(void) {
     if (!stream_enabled) return;
     uint32_t now = get_time_us();
@@ -73,6 +91,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     }
     if (data[0] == 0x3) {
       set_controller(data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+      config_received = 1;
     }
     if (data[0] == 0x4) {
       stream_motor_id    = data[1];
@@ -84,8 +103,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       stream_enabled = 0;
     }
     if (data[0] == 0x6) {
-      uint8_t pong[2] = {0xA1, (uint8_t)(board_id & 0xFF)};
-      CAN_Send(board_id, pong, FDCAN_DLC_BYTES_2);
+      uint8_t pong[3] = {0xA1, (uint8_t)(board_id & 0xFF), config_received};
+      CAN_Send(board_id, pong, FDCAN_DLC_BYTES_3);
     }
     // if (data[0] == 0x4) {
     //   motor_power_setup(data[1]);

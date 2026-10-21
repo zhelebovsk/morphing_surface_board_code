@@ -136,6 +136,7 @@ int main(void)
     if (get_time_us() - last_call > 100) {
       last_call = get_time_us();
       fix_motor_speeds();
+      CAN_Check_Bus_Off();
     }
     /* USER CODE END WHILE */
 

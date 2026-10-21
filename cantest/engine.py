@@ -30,6 +30,14 @@ class ControlMotor:
         from limits import load_all_limits
         _, _, self.min_pwm_by_board = load_all_limits()
 
+        # Config last sent to each board via send_config(), re-sent by the
+        # monitor loop to any board that reset since. A board that never got
+        # one (e.g. connected later) gets the most recent config sent to any
+        # board. Empty until the user first sends one — until then every
+        # board is on firmware defaults anyway.
+        self._config_by_board = {}
+        self._last_config = None
+
         self.running = False
         self.step_index = 0
         self._frame_queue = queue.Queue()
@@ -130,6 +138,7 @@ class ControlMotor:
         while self._monitor_running:
             try:
                 self.communication.poll_presence(self.board_count)
+                self._resend_config_where_needed()
                 # Nothing answered at all -> the bus itself is likely down
                 # (unterminated/disconnected), not just one flaky board.
                 # Back off instead of hammering a dead bus every second.
@@ -141,6 +150,16 @@ class ControlMotor:
                 print(f"presence check failed: {e}")
                 current_interval = min(current_interval * 2, max_interval)
             time.sleep(current_interval)
+
+    def _resend_config_where_needed(self):
+        if self._last_config is None:
+            return
+        boards = sorted(self.communication.needs_config & self.communication.active_boards)
+        if not boards:
+            return
+        print(f"Re-sending controller config to board(s) {boards} (reset since last config)")
+        for board_id in boards:
+            self.send_config([board_id], *self._config_by_board.get(board_id, self._last_config))
 
     def shutdown(self):
         self.running = False
@@ -195,7 +214,10 @@ class ControlMotor:
     def send_config(self, board_ids, kp, ki, kd, alpha, limit_signal, deadband, min_pwm=None):
         # min_pwm=None (the default) means "use each board's own calibrated
         # value from HW_tests" instead of forcing one number on every board.
+        self._last_config = (kp, ki, kd, alpha, limit_signal, deadband, min_pwm)
         for board_id in board_ids:
+            self._config_by_board[board_id] = self._last_config
+            self.communication.needs_config.discard(board_id)
             pwm = min_pwm if min_pwm is not None else self.min_pwm_by_board[board_id - 1]
             self.communication.send_board_config(
                 board_id, kp, ki, kd, alpha, limit_signal, deadband, pwm

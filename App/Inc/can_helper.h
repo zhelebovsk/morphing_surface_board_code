@@ -11,6 +11,7 @@ HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len);
 HAL_StatusTypeDef CAN_Send_ID(uint32_t board_id);
 void CAN_Send_Pot(uint32_t board_id, uint16_t *pot_values);
 void CAN_Stream_Update(void);
+void CAN_Check_Bus_Off(void);
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
 
 

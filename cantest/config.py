@@ -1,4 +1,3 @@
-SCALING_FACTOR = 2.5
 REFACTORING = True
 
 MOTOR_SPACING_MM = 10.0   # mm per motor index (Y axis)

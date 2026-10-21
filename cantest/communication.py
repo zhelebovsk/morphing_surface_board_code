@@ -72,6 +72,13 @@ class MotorCommunication:
         self._miss_counts = {}
         self._monitor_cursor = 0
 
+        # Boards that need their controller config (0x03) re-sent: the config
+        # lives in board RAM only, so any reset reverts it to firmware
+        # defaults. Filled from the pong's "config received" byte, and — for
+        # older firmware whose pong lacks that byte — when a board comes back
+        # after being marked missing. Drained by ControlMotor's monitor loop.
+        self.needs_config = set()
+
         # scan_boards() and poll_presence() both listen on the same socket for
         # pongs; without this lock a background presence check and a manual
         # scan can steal each other's replies, producing false "missing" boards.
@@ -193,6 +200,11 @@ class MotorCommunication:
                     break
                 if len(msg.data) >= 2 and msg.data[0] == 0xA1:
                     responder = msg.arbitration_id - 0x100
+                    if len(msg.data) >= 3:
+                        if msg.data[2]:
+                            self.needs_config.discard(responder)
+                        else:
+                            self.needs_config.add(responder)
                     if responder in remaining_targets:
                         found.add(responder)
                         remaining_targets.discard(responder)
@@ -304,6 +316,9 @@ class MotorCommunication:
         for board_id in targets:
             if board_id in replied:
                 self._miss_counts[board_id] = 0
+                if board_id not in self.active_boards:
+                    # Back after being marked missing: it may well have reset.
+                    self.needs_config.add(board_id)
                 self.active_boards.add(board_id)
             else:
                 misses = self._miss_counts.get(board_id, 0) + 1

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-07T17:52:47.895107",
+  "timestamp": "2026-10-19T14:29:07.601751",
   "theoretical": {
     "sysclk_mhz": 170.0,
     "adc_clock_mhz": 42.5,
@@ -16,12 +16,6 @@
     "control_loop_hz": 2000.0,
     "note": "ADC1 is the bottleneck (13 ch). Hardware can do 88358 Hz, but the control loop in main.c only triggers every 500 \u00b5s \u2192 2000 Hz actual rate."
   },
-  "measured": {
-    "conv_counter_start": 18923913,
-    "conv_counter_end": 18938848,
-    "delta_conversions": 14935,
-    "elapsed_sec": 2.0001,
-    "actual_hz": 7467.17
-  },
-  "error": null
+  "measured": null,
+  "error": "Could not connect to OpenOCD telnet: [Errno 111] Connection refused"
 }
