@@ -68,10 +68,10 @@ erase them on regeneration.
 4. `position_init()`: take 1000 pot samples (~0.5–1 s) and set every motor's setpoint to
    where it currently is — the surface holds still at power-up.
    Position commands that arrive during this window are overwritten at its end.
-5. Main loop: whenever >100 µs have passed, call `fix_motor_speeds()` and
+5. Main loop: whenever >100 µs have passed, call `control_loop()` and
    `CAN_Check_Bus_Off()` (restarts the CAN controller if it took itself off the bus).
 
-### Control loop — `fix_motor_speeds()`
+### Control loop — `control_loop()`
 
 Every iteration, for all 16 motor indices:
 

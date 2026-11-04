@@ -24,7 +24,7 @@ void motor_pwm_timers_start(void);
 void start_potentiometer_limits(void);
 void position_init(void);
 void motor_location_set(uint8_t motor_id, uint16_t location); 
-void fix_motor_speeds();
+void control_loop();
 
 
 void set_controller(uint8_t kp, uint8_t ki, uint8_t kd, uint8_t a, uint8_t u_lim, uint8_t db, uint8_t min_p);

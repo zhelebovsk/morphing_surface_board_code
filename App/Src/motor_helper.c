@@ -177,7 +177,7 @@ void set_motor(uint8_t motor_id, int16_t motor_set) {
 	set_motor_power(motor_id, pwm_value);
 }
 
-void fix_motor_speeds(){
+void control_loop(){
   static uint32_t last_time_us = 0;
   uint32_t now = get_time_us();
   float dt = (last_time_us == 0) ? 0.0005f : (float)(now - last_time_us) / 1e6f;

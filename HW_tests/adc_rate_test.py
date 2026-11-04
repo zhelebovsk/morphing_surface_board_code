@@ -65,7 +65,7 @@ ADC2_TIME_US      = (ADC2_CYCLES / ADC_CLOCK_HZ) * 1e6
 BOTTLENECK_US     = max(ADC1_TIME_US, ADC2_TIME_US)
 THEORETICAL_MAX_HZ = 1e6 / BOTTLENECK_US
 
-# From main.c: fix_motor_speeds() called every 500 µs → 2000 Hz actual rate
+# From main.c: control_loop() called every 500 µs → 2000 Hz actual rate
 CONTROL_LOOP_US   = 500
 CONTROL_LOOP_HZ   = 1e6 / CONTROL_LOOP_US
 
