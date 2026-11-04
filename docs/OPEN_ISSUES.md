@@ -42,10 +42,30 @@ telemetry.
   oversampled.
 - Measure first: `cantest/test_comms.py` runs the full 60-frame cycle against however
   many boards are present (the real boards ACK the frames for the absent ones).
-- **CAN FD (planned):** one frame per board at a faster data rate, ~20–30% load. Needs a
-  firmware change and `fd on dbitrate …` in `can_start_kvaser.sh`; the slcan adapter would
-  stop working.
+- **CAN FD (planned, ready to test):** one 16-byte frame per board (`0x07`) with a 2 Mbit/s
+  data phase, ~35% load. Implemented but off by default — test steps below. The slcan
+  adapter can't do FD.
 - Sending only changed values is another option.
+
+**Testing CAN FD** (after the classic setup is verified on the bench):
+
+1. **FD-safe check** — classic firmware (`CAN_FD_ENABLED 0`): run `./can_start_kvaser.sh fd`,
+   set `CAN_FD = True` in `cantest/config.py`, start the GUI and **Start dynamic**. The board
+   should answer pings but not move, and `bus-errors` in `ip -details -statistics link show
+   can0` should stay at 0. This confirms a board that isn't flashed yet can't disturb an FD
+   bus.
+2. Set `#define CAN_FD_ENABLED 1` in `App/Inc/can_helper.h`, `make`, flash.
+3. Back to the classic script and `CAN_FD = False`: the board should work exactly as before
+   (FD firmware still accepts classic frames).
+4. `./can_start_kvaser.sh fd` and `CAN_FD = True` again: the board answers pings, motors
+   follow **Start dynamic**, and `bus-errors` stays at 0.
+5. Run `cantest/test_comms.py` and compare the send time with classic.
+
+To go back: `CAN_FD_ENABLED 0`, `CAN_FD = False`, plain `./can_start_kvaser.sh`.
+
+**Note:** a board flashed before `ProtocolException = ENABLE` (in `STM32_code.ioc` /
+`fdcan.c`) answers every FD frame with an error frame, freezing the whole surface. Reflash
+every board before switching the host to FD.
 
 ### 3. CAN termination — confirm with the board designer
 

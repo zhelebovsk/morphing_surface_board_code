@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Bring up can0 via Kvaser Leaf v3 (uses kvaser_usb kernel module — no slcand needed).
 # Run once after plugging in the Kvaser. The device appears as can0 automatically.
+#
+#   ./can_start_kvaser.sh       classic CAN, 1 Mbit/s (default)
+#   ./can_start_kvaser.sh fd    CAN FD: 1 Mbit/s arbitration, 2 Mbit/s data. Only with
+#                               firmware built with CAN_FD_ENABLED 1 and CAN_FD = True
+#                               in cantest/config.py (docs/OPEN_ISSUES.md #2).
 
 sudo modprobe kvaser_usb 2>/dev/null
 
@@ -35,6 +40,12 @@ sudo ip link set can0 txqueuelen 1000
 # survive, and the other boards see nothing but an idle bus and keep holding
 # their last commanded position. Cost is ~100 ms, i.e. ~10 dropped frames at
 # the 100 Hz command rate.
-sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
-
-echo "CAN interface can0 is up (Kvaser)"
+if [ "$1" = "fd" ]; then
+    # Data phase matches the board: 2 Mbit/s, 80% sample point.
+    sudo ip link set can0 up type can bitrate 1000000 dbitrate 2000000 dsample-point 0.8 \
+        fd on restart-ms 100
+    echo "CAN interface can0 is up (Kvaser, CAN FD)"
+else
+    sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
+    echo "CAN interface can0 is up (Kvaser)"
+fi

@@ -25,6 +25,28 @@ void CAN_Check_Bus_Off(void) {
     }
 }
 
+// Switches FDCAN1 from the CubeMX classic setup to FD when CAN_FD_ENABLED.
+// Call after MX_FDCAN1_Init(), before HAL_FDCAN_Start(). In FD mode the board
+// still receives and sends classic frames, so a classic host keeps working.
+void CAN_Configure_FD(void) {
+#if CAN_FD_ENABLED
+    // Data phase: 160 MHz / 4 = 40 MHz, 20 tq (1 + 15 + 4) -> 2 Mbit/s, 80% sample point.
+    hfdcan1.Init.FrameFormat       = FDCAN_FRAME_FD_BRS;
+    hfdcan1.Init.DataPrescaler     = 4;
+    hfdcan1.Init.DataSyncJumpWidth = 4;
+    hfdcan1.Init.DataTimeSeg1      = 15;
+    hfdcan1.Init.DataTimeSeg2      = 4;
+    if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK) {
+        Error_Handler();
+    }
+    // The isolated transceiver's loop delay is a large share of a 500 ns data
+    // bit; compensation makes the board check its own bits at the right time.
+    HAL_FDCAN_ConfigTxDelayCompensation(&hfdcan1,
+        hfdcan1.Init.DataPrescaler * hfdcan1.Init.DataTimeSeg1, 0);
+    HAL_FDCAN_EnableTxDelayCompensation(&hfdcan1);
+#endif
+}
+
 void CAN_Stream_Update(void) {
     if (!stream_enabled) return;
     uint32_t now = get_time_us();
@@ -74,7 +96,7 @@ void CAN_Send_Pot(uint32_t board_id, uint16_t *pot_values) {
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
   if (RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) {
     FDCAN_RxHeaderTypeDef header;
-    uint8_t data[8];
+    uint8_t data[64];  // FD frames carry up to 64 bytes
     HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &header, data);
     if (header.Identifier != board_id) {
       return;
@@ -87,6 +109,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     if (data[0] == 0x2) { 
       for(int i = 0; i < 7; i++) {
         motor_location_set(active_motors[i+7], data[i+1]*LOCATION_MULTIPLIER); 
+      }
+    }
+    // All 14 positions in one FD frame (CAN_FD_ENABLED only).
+    if (data[0] == 0x7 && header.DataLength >= FDCAN_DLC_BYTES_16) {
+      for(int i = 0; i < 14; i++) {
+        motor_location_set(active_motors[i], data[i+1]*LOCATION_MULTIPLIER);
       }
     }
     if (data[0] == 0x3) {

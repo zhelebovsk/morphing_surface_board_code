@@ -117,6 +117,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   board_id = Read_Board_ID();
+  CAN_Configure_FD();
   HAL_FDCAN_Start(&hfdcan1);
   HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, ENABLE);
   Calibrate_ADC();

@@ -47,6 +47,17 @@ so `p` = 0..255 maps to ADC 1048..2833. Slot *k* drives firmware motor
 The host sends `0x02` then `0x01` for each board, and skips boards it currently believes are
 absent.
 
+### `0x07` — set all positions (CAN FD only)
+
+```
+0x07: [0x07, p0, p1, …, p13, 0]    16-byte FD frame, bit-rate switch on
+```
+
+Same `p` bytes as `0x01`/`0x02`, all 14 in one frame. Sent instead of `0x01`/`0x02` when
+`CAN_FD = True` in `cantest/config.py`; the board accepts it only when built with
+`CAN_FD_ENABLED 1` (OPEN_ISSUES #2). Data phase is 2 Mbit/s. A board built without it
+ignores FD frames without disturbing the bus (protocol exception handling is enabled).
+
 ### `0x03` — controller config
 
 ```
@@ -129,7 +140,7 @@ All little-endian.
 
 `can_helper.c` still contains commented-out handlers for older opcodes (speed up/down, reset
 `0x0D`, raw PWM `0x0E`/`0x0F`, motor supply voltage). They are not compiled in. If you
-revive one, note that `0x04`–`0x06` have since been reused.
+revive one, note that `0x04`–`0x07` are now in use.
 
 ## Bus budget (predicted, not measured)
 

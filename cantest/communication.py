@@ -3,7 +3,7 @@ import time
 import threading
 import re
 import subprocess
-from config import REFACTORING, MOTOR_RANGE
+from config import REFACTORING, MOTOR_RANGE, CAN_FD
 from utils import clamp8
 import os
 
@@ -43,6 +43,15 @@ def read_tx_packets(channel):
         return None
     try:
         with open(f"/sys/class/net/{channel}/statistics/tx_packets") as f:
+            return int(f.read())
+    except (OSError, ValueError):
+        return None
+
+
+def read_mtu(channel):
+    """72 when the interface is in CAN FD mode, 16 for classic, None if unknown."""
+    try:
+        with open(f"/sys/class/net/{channel}/mtu") as f:
             return int(f.read())
     except (OSError, ValueError):
         return None
@@ -89,12 +98,15 @@ class MotorCommunication:
 
         if not self.demo:
             try:
-                self.bus = can.interface.Bus(channel=channel, interface="socketcan")
+                self.bus = can.interface.Bus(channel=channel, interface="socketcan", fd=CAN_FD)
             except OSError:
                 print("CAN open failed, switching to demo mode")
                 self.demo = True
+            if CAN_FD and not self.demo and read_mtu(channel) != 72:
+                print(f"WARNING: CAN_FD is on but {channel} is not in FD mode — "
+                      f"run ./can_start_kvaser.sh fd")
 
-    def send_frame(self, data, board_id, verbose=False):
+    def send_frame(self, data, board_id, verbose=False, fd=False):
         if self.demo:
             if verbose:
                 print(f"DEMO -> board {board_id:2d}: [{' '.join(f'{b:3d}' for b in data)}]")
@@ -104,6 +116,8 @@ class MotorCommunication:
             arbitration_id=board_id + 0x100,
             data=data,
             is_extended_id=False,
+            is_fd=fd,
+            bitrate_switch=fd,
         )
         try:
             self.bus.send(msg, timeout=0.1)
@@ -353,6 +367,16 @@ class MotorCommunication:
             # Skip boards we know are absent — once we've scanned at least
             # once, don't waste bus time/cycle budget writing into the void.
             if self._scanned and board_id not in self.active_boards:
+                continue
+
+            if CAN_FD:
+                # 0x07 + 14 positions, padded to 16 (a valid FD frame length).
+                data = bytes(
+                    [7] +
+                    [self.scale_value(board_index, m, locations[board_index][m]) for m in range(14)] +
+                    [0]
+                )
+                self.send_frame(data, board_id, fd=True)
                 continue
 
             data_low = bytes(
