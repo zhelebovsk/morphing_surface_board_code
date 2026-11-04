@@ -3,7 +3,7 @@ import time
 import threading
 import re
 import subprocess
-from config import REFACTORING, MOTOR_RANGE, CAN_FD
+from config import REFACTORING, MOTOR_RANGE
 from utils import clamp8
 import os
 
@@ -48,8 +48,11 @@ def read_tx_packets(channel):
         return None
 
 
+CAN_FD_MTU = 72  # classic CAN interfaces report 16
+
+
 def read_mtu(channel):
-    """72 when the interface is in CAN FD mode, 16 for classic, None if unknown."""
+    """The interface's MTU, which shows whether it is in CAN FD mode, or None if unknown."""
     try:
         with open(f"/sys/class/net/{channel}/mtu") as f:
             return int(f.read())
@@ -73,6 +76,10 @@ class MotorCommunication:
         self.channel = channel
         self.demo = (channel == "DEMO-MODE")
         self.min_limits = min_limits
+
+        # `./can_start_kvaser.sh fd` puts the interface in FD mode; follow it
+        # rather than keeping a second setting that could disagree with it.
+        self.fd = not self.demo and read_mtu(channel) == CAN_FD_MTU
 
         # Boards confirmed present. Populated by scan_boards()/poll_presence();
         # empty (== "unknown") means send_positions falls back to sending to everyone.
@@ -98,13 +105,13 @@ class MotorCommunication:
 
         if not self.demo:
             try:
-                self.bus = can.interface.Bus(channel=channel, interface="socketcan", fd=CAN_FD)
+                self.bus = can.interface.Bus(channel=channel, interface="socketcan", fd=self.fd)
+                if self.fd:
+                    print(f"{channel} is in CAN FD mode: sending positions as FD frames (0x07)")
             except OSError:
                 print("CAN open failed, switching to demo mode")
                 self.demo = True
-            if CAN_FD and not self.demo and read_mtu(channel) != 72:
-                print(f"WARNING: CAN_FD is on but {channel} is not in FD mode — "
-                      f"run ./can_start_kvaser.sh fd")
+                self.fd = False
 
     def send_frame(self, data, board_id, verbose=False, fd=False):
         if self.demo:
@@ -369,7 +376,7 @@ class MotorCommunication:
             if self._scanned and board_id not in self.active_boards:
                 continue
 
-            if CAN_FD:
+            if self.fd:
                 # 0x07 + 14 positions, padded to 16 (a valid FD frame length).
                 data = bytes(
                     [7] +

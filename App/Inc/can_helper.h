@@ -8,7 +8,7 @@
 #include "timer_helper.h"
 
 // 0 = classic CAN (default). 1 = CAN FD with bit-rate switching: 1 Mbit/s
-// arbitration, 2 Mbit/s data. Must match CAN_FD in cantest/config.py and
+// arbitration, 2 Mbit/s data. Needed on every board before the bus runs on
 // `./can_start_kvaser.sh fd` (docs/OPEN_ISSUES.md #2).
 #define CAN_FD_ENABLED 0
 

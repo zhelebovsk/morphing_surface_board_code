@@ -4,8 +4,8 @@
 #
 #   ./can_start_kvaser.sh       classic CAN, 1 Mbit/s (default)
 #   ./can_start_kvaser.sh fd    CAN FD: 1 Mbit/s arbitration, 2 Mbit/s data. Only with
-#                               firmware built with CAN_FD_ENABLED 1 and CAN_FD = True
-#                               in cantest/config.py (docs/OPEN_ISSUES.md #2).
+#                               firmware built with CAN_FD_ENABLED 1. The host app detects
+#                               FD mode from the interface (docs/OPEN_ISSUES.md #2).
 
 sudo modprobe kvaser_usb 2>/dev/null
 

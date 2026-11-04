@@ -54,9 +54,10 @@ absent.
 ```
 
 Same `p` bytes as `0x01`/`0x02`, all 14 in one frame. Sent instead of `0x01`/`0x02` when
-`CAN_FD = True` in `cantest/config.py`; the board accepts it only when built with
-`CAN_FD_ENABLED 1` (OPEN_ISSUES #2). Data phase is 2 Mbit/s. A board built without it
-ignores FD frames without disturbing the bus (protocol exception handling is enabled).
+`can0` is in FD mode (`./can_start_kvaser.sh fd`, detected from its MTU); the board accepts
+it only when built with `CAN_FD_ENABLED 1` (OPEN_ISSUES #2). Data phase is 2 Mbit/s. A board
+built without it ignores FD frames without disturbing the bus (protocol exception handling
+is enabled).
 
 ### `0x03` — controller config
 

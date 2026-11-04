@@ -50,18 +50,18 @@ telemetry.
 **Testing CAN FD** (after the classic setup is verified on the bench):
 
 1. **FD-safe check** — classic firmware (`CAN_FD_ENABLED 0`): run `./can_start_kvaser.sh fd`,
-   set `CAN_FD = True` in `cantest/config.py`, start the GUI and **Start dynamic**. The board
-   should answer pings but not move, and `bus-errors` in `ip -details -statistics link show
+   start the GUI and **Start dynamic**. The board should answer pings but not move, and `bus-errors` in `ip -details -statistics link show
    can0` should stay at 0. This confirms a board that isn't flashed yet can't disturb an FD
    bus.
 2. Set `#define CAN_FD_ENABLED 1` in `App/Inc/can_helper.h`, `make`, flash.
-3. Back to the classic script and `CAN_FD = False`: the board should work exactly as before
+3. Back to the classic script (`./can_start_kvaser.sh`): the board should work exactly as before
    (FD firmware still accepts classic frames).
-4. `./can_start_kvaser.sh fd` and `CAN_FD = True` again: the board answers pings, motors
+4. `./can_start_kvaser.sh fd` again: the board answers pings, motors
    follow **Start dynamic**, and `bus-errors` stays at 0.
 5. Run `cantest/test_comms.py` and compare the send time with classic.
 
-To go back: `CAN_FD_ENABLED 0`, `CAN_FD = False`, plain `./can_start_kvaser.sh`.
+To go back: `CAN_FD_ENABLED 0`, plain `./can_start_kvaser.sh`. The host follows `can0`'s mode
+(it prints a line when it is in FD mode), so restart the GUI after switching.
 
 **Note:** a board flashed before `ProtocolException = ENABLE` (in `STM32_code.ioc` /
 `fdcan.c`) answers every FD frame with an error frame, freezing the whole surface. Reflash
