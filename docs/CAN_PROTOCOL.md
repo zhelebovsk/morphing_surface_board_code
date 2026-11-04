@@ -1,6 +1,7 @@
 # CAN Protocol
 
-Classic CAN (not FD), **1 Mbit/s**, standard 11-bit IDs, 8-byte max payload.
+Classic CAN, **1 Mbit/s**, standard 11-bit IDs, 8-byte max payload (CAN FD planned,
+OPEN_ISSUES #2).
 Source of truth: `App/Src/can_helper.c` (board side), `cantest/communication.py` (host side).
 
 ## Addressing
@@ -17,9 +18,10 @@ CAN ID = 0x100 + DIP value        board 1 → 0x101, board 30 → 0x11E
 - **The same ID is used in both directions.** The host sends commands to `0x100+n`; board
   *n* replies on `0x100+n` too. Replies are told apart from commands by their first byte
   (`0xA0`/`0xA1`), never by ID.
-- There is **no hardware acceptance filter** (one was tried and crashed release builds — see
-  `CHANGES_2026-08-11.md`). Every board receives every frame and discards the ones whose ID
-  isn't its own in the RX interrupt.
+- There is **no hardware acceptance filter**: every board receives every frame, and the RX
+  interrupt discards the ones with another board's ID.
+
+  **Note:** a hardware filter (`StdFiltersNbr`) crashed release builds; cause not found.
 
 Byte 0 of every frame is the opcode.
 
@@ -61,10 +63,9 @@ absent.
 | deadband | error (ADC counts) below which the motor is switched off | 10 | 10 |
 | min_pwm | minimum PWM whenever outside deadband (overcomes stiction) | 50 | per-board calibrated value |
 
-Applies to **all motors on the board**. Not stored in flash: **a board that resets comes back
-with the boot defaults** until the host sends `0x03` again. Once a config has been sent from
-the GUI, the host re-sends it automatically to any board that reports (in its pong) that it
-hasn't received one.
+Applies to **all motors on the board**. Kept in RAM only: after a reset the board runs on the
+boot defaults until the host re-sends it, which happens automatically once a config has been
+sent from the GUI (OPEN_ISSUES #10).
 
 ### `0x04` / `0x05` — telemetry stream on / off
 
@@ -80,8 +81,9 @@ streaming.
 
 Used by `HW_tests/calibration_app.py` and `step_response_test.py` to watch how a motor
 responds to a small step (did it move, which way, how fast). The main GUI never uses it.
-It replaced reading positions over ST-LINK/OpenOCD, which halts the CPU on every read and
-corrupted the measurements.
+
+**Note:** use this, not OpenOCD, to measure motion: OpenOCD reads halt the CPU and distort
+the measurement.
 
 `interval_ms = 0` streams on every control-loop iteration. Only one motor per board can
 stream at a time.
@@ -120,8 +122,8 @@ All little-endian.
   responder from the arbitration ID (`id - 0x100`).
 - Byte 2 is `1` once the board has received a `0x03` config since it booted, `0` before. The
   host re-sends config to any board reporting `0` (see `ControlMotor._resend_config_where_needed`).
-  Firmware before 2026-10-19 sends a 2-byte pong without it; the host still accepts that and
-  falls back to re-sending config when a board reappears after being marked missing.
+  Older firmware sends a 2-byte pong; the host then re-sends config whenever a board
+  reappears after being marked missing.
 
 ## Retired opcodes
 
@@ -133,4 +135,4 @@ revive one, note that `0x04`–`0x06` have since been reused.
 
 A full position cycle is 2 frames × 30 boards = 60 frames of ~118 bits ≈ **7.1 ms per cycle**,
 i.e. **~70% bus load at 100 Hz**. That's high for CAN (30–40% is the usual comfort zone).
-See OPEN_ISSUES.md.
+See OPEN_ISSUES #2.

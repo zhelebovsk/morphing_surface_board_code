@@ -17,12 +17,13 @@
      └──────── 16 potentiometers (ADC) ◄──────────┘
 ```
 
-The PC decides *where* every motor should be; each board independently runs a PID loop
-per motor to *get* it there. If CAN goes quiet, boards keep holding their last setpoint.
+The PC  calulates where every motor should be based on the given function.
+each board independently runs a PID loop per motor to get it there. 
+If the CANBUS goes quiet, boards keep holding their last setpoint.
 
-> **Note:** classic CAN, not FD. FD was tried on 2026-06-22 and reverted after
-> communication failed — but the unrelated boot-order bug (fixed 2026-08-11) was breaking
-> communication at the time, so FD may deserve a retry (OPEN_ISSUES #2).
+**Note:** the PC computes the shape for all boards to guaranty all boards move in sync.
+
+**Note:** using classic CAN currently; a move to CAN FD is planned (OPEN_ISSUES #2).
 
 ## Board hardware (summary)
 
@@ -59,36 +60,39 @@ erase them on regeneration.
 ### Boot sequence
 
 1. HAL + clocks + peripherals (CubeMX).
-2. Read DIP → `board_id`, **then** start FDCAN and enable the RX interrupt.
-
-   > **Note:** the order matters: the board needs its ID before it can accept or answer
-   > traffic (`CHANGES_2026-08-11.md`).
+2. Read DIP → `board_id`, then start FDCAN and enable the RX interrupt.
+    **Note:** the board must know its ID before it can accept or answer CAN traffic.
 3. ADC calibration, start TIM2, DAC outputs the 2.5 V / 0.5 V limit thresholds, select the
    6 V motor rail, start PWM timers.
 4. `position_init()`: take 1000 pot samples (~0.5–1 s) and set every motor's setpoint to
-   where it currently is — the surface holds still at power-up.
+   where it currently is - the surface holds still at power-up.
    Position commands that arrive during this window are overwritten at its end.
 5. Main loop: whenever >100 µs have passed, call `control_loop()` and
    `CAN_Check_Bus_Off()` (restarts the CAN controller if it took itself off the bus).
 
 ### Control loop — `control_loop()`
 
-Every iteration, for all 16 motor indices:
+Called from the main loop, at most every 100 µs (~2 kHz in practice). Covers all 16 hardware
+channels; the 2 unused ones have no pot, read ~4095, and are always held off by the hard stop.
+Each pass:
 
 1. **Sample:** start ADC1+ADC2 DMA and wait for both to finish (bounded at 2 ms; on timeout
    the last good values are kept and `adc_timeout_count` is incremented).
    `adc_index_map` reorders the 16 ADC results into motor order.
 2. **Filter:** `pot_filtered = alpha·raw + (1−alpha)·pot_filtered`.
 3. **Hard stop:** if `pot_filtered` is outside **[680, 3415]**, the motor is switched off and
-   its PID state reset. (Unconnected channels read ~4095, so they are permanently "off".)
+   its PID state reset.
+
+   **Note:** this range keeps each motor where its rotation-to-linear movement is close to
+   linear.
 4. **Deadband:** if |error| < `deadband`, motor off, integral reset.
 5. **PID** with measured `dt`, integral clamped to ±500, output negated (motor/pot polarity),
    clamped to ±`u_limit`, then raised to at least ±`min_pwm`.
 6. **Output:** sign → DIR pin, magnitude → PWM compare (0..255, ~52 kHz PWM).
 7. `CAN_Stream_Update()` sends a telemetry frame if streaming is on and the interval elapsed.
 
-The loop *targets* 10 kHz, but the blocking ADC wait limits it to **~2 kHz** in practice
-(measured with `HW_tests/adc_rate_test.py`). Alpha values are tuned for 2 kHz.
+Runs at ~2 kHz, not the 10 kHz target, because the ADC wait blocks (OPEN_ISSUES #6). Alpha
+is tuned for 2 kHz.
 
 CAN reception is interrupt-driven (`HAL_FDCAN_RxFifo0Callback`) and only updates setpoints
 and config variables; it never touches the motors directly.
@@ -132,11 +136,10 @@ Choosing **DEMO-MODE** in the channel picker runs everything without hardware.
   pings; backs off to 10 s if *no* board answers. It also re-sends controller config to any
   board whose pong says it hasn't received one since boot. Sends never wait on it.
 
-  > **Note:** the back-off separates "one flaky board" (keep checking it every second) from
-  > "bus is down" (no point flooding a dead bus with pings).
+  **Note:** backing off avoids flooding a dead bus with pings.
 
-  > **Note:** config is re-sent automatically because the board keeps it in RAM only — any
-  > reset, brown-out or re-flash silently reverts it to the firmware defaults.
+  **Note:** the board keeps its config in RAM only, so any reset reverts it to firmware
+  defaults (OPEN_ISSUES #10).
 
 ### From shape function to motor position
 
@@ -150,14 +153,15 @@ motor_function(x_mm, y_mm, t)                   ∈ [−1, 1]
 → ADC setpoint = 1048 + byte·7                   clamped [680, 3415]   firmware
 ```
 
-`motor_max.csv` exists but **is not read** — the top of each motor's range is always
-`motor_min + MOTOR_RANGE`. `REFACTORING = False` in `config.py` bypasses `motor_min`
-scaling entirely (legacy).
+`motor_max.csv` is not used (OPEN_ISSUES #9). `REFACTORING` in `config.py` must stay `True`;
+`False` sends the shape values unscaled, ignoring `motor_min`.
 
 ## Motor numbering — four schemes, be careful
 
 The same physical motor has a different number in each layer. Firmware indices 0 and 15
 (hardware channels 1 and 16) are not driven by the host.
+
+**Note:** 14 motors because there's no physical room for 16.
 
 | Host / `motor_min.csv` | CAN slot | Firmware index (`motor_helper.c`, OpenOCD, `0x04` stream) | Hardware channel (`PWMn`/`DIR_n`, calibration JSON key, `M`n in calibration app) |
 |---|---|---|---|
@@ -171,17 +175,15 @@ The same physical motor has a different number in each layer. Firmware indices 0
 | — | — | 0, 15 | 1, 16 (unused) |
 
 The mapping lives in `active_motors[]` in `App/Src/board_config.c`. Pin and timer for each
-hardware channel: `memos/motor-dir-and-pwm.md` (its PWM table is current; its prescaler
-note is not — the timers now run at prescaler 12, ~52 kHz).
+hardware channel: `memos/motor-dir-and-pwm.md`.
 
 ## FPGA (`lattice_code/`)
 
 The Lattice FPGA sits between the STM32's PWM/DIR outputs and the motor drivers. The
 Verilog (`scaled_digital_*.v`, `digital_on.v`) converts each PWM+DIR pair into the
 two-input drive the motor driver (DRV8833-type) expects, and contains a pot combiner. It is
-programmed separately with Lattice Diamond over JTAG (connector X7). Which `.v` variant is
-currently flashed on the boards is not recorded anywhere — confirm with whoever programmed
-them before changing it.
+programmed separately with Lattice Diamond over JTAG (connector X7). Which variant is on the
+boards isn't recorded (OPEN_ISSUES, Housekeeping).
 
 ## Hardware test tools (`HW_tests/`)
 

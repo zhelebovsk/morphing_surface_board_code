@@ -45,17 +45,13 @@ ip -details link show can0      # expect: "can state ERROR-ACTIVE restart-ms 100
 
 `restart-ms 100` is essential: `can0` recovers by itself 100 ms after a bus-off.
 
-> **Note:** Linux's default (`restart-ms 0`) is to never recover, so a single bus-off left
-> `can0` dead until someone ran `ip link set can0 down/up` by hand.
+**Note:** Linux's default is `restart-ms 0`, which never recovers from a bus-off.
 
 If you keep a copy of the script elsewhere (e.g. a Desktop shortcut), make it a symlink to
 the repo's script so it can't go stale.
 
-Do **not** add `one-shot on`.
-
-> **Note:** one-shot (send each frame once, no automatic retries) would prevent bus-off
-> outright, but this Kvaser's firmware doesn't support it — tested: the whole `ip` command
-> fails with `Operation not supported`, leaving `can0` down.
+Do **not** add `one-shot on` — this Kvaser doesn't support it, so the `ip` command fails
+and `can0` stays down.
 
 `can_start.sh` is the equivalent for a serial slcan adapter: `./can_start.sh 6` uses
 `/dev/ttyACM6`.
@@ -82,8 +78,7 @@ python main.py
    lists the absent ones (`N board(s) not responding: [...]`) — **normal**, the rest still
    work.
 
-   > **Note:** pinging absent boards is harmless. On CAN, any live node acknowledges every
-   > frame, whoever it's addressed to, so no errors build up as long as one board is up.
+   **Note:** pinging absent boards is harmless — any live board acknowledges every frame.
 3. **Send the controller config** — "Board config packet" bar → **Send to all boards**.
    Boards boot with built-in defaults, and each board's calibrated `min_pwm` is only applied
    when you send this. After that, the app re-sends it automatically to any board that
@@ -171,8 +166,7 @@ though traffic is flowing normally. Don't trust the state alone — check whethe
 packets` counter is still increasing (a frame only counts once a node acknowledged it), or
 just ping a board.
 
-> **Note:** this is why the code's own "nothing is answering" check watches the TX counter
-> instead of the reported state.
+**Note:** the app's "nothing is answering" check uses the TX counter for this reason.
 
 The kernel log records real bus-off events with timestamps:
 

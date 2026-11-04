@@ -9,7 +9,7 @@ PWM signal is subject to be set and checked, though the fpga is not configured y
 
 tim 1, 3, 4, 8
 
-prescaler is 6-1 and 256-1 is the period
+prescaler is 12-1 and 256-1 is the period (~52 kHz at 160 MHz)
 auto-preload (not to change the values on the middle of running, but only in the beginning of the period)
 
 pwm1    PE9     1-1

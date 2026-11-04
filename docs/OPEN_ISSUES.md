@@ -1,13 +1,12 @@
 # Open Issues & Backlog
 
-As of 2026-10-19. Ordered roughly by how soon it will bite. Dated `CHANGES_*.md` files have
-the full background for each item.
+Ordered roughly by how soon each item will bite. Background is in the dated `CHANGES_*.md`
+files.
 
 ## What has and hasn't been verified
 
 **Every run to date has used exactly one board.** Verified on hardware with one board:
-flashing, CAN commands and pong, telemetry streaming, PID with calibrated `min_pwm` (on the
-two motors that are attached — see "From early hardware bring-up" below),
+flashing, CAN commands and pong, telemetry streaming, PID with calibrated `min_pwm`,
 the calibration app, presence scanning, PC-side bus-off recovery (`restart-ms 100`), and the
 "nothing is answering" early stop.
 
@@ -15,35 +14,21 @@ the calibration app, presence scanning, PC-side bus-off recovery (`restart-ms 10
 the bus, bus load at 30 boards, termination with many boards, presence tracking at scale,
 the full mechanical surface moving together.
 
+The bench board has motors only on hardware channels 12 and 13; calibration results for
+other channels are meaningless.
+
 Scale up incrementally (2 boards, then 4, 8, …) and check `ip -details -statistics link
 show can0` error counters and the send-time warning after each step, rather than wiring all
 30 at once.
 
 ## Before connecting more boards
 
-### 1. Controller config is lost when a board resets — FIXED in code, not yet on hardware
+### 1. Config re-send after a board reset — needs flashing + bench test
 
-The `0x03` config (Kp/Ki/Kd, alpha, `u_limit`, deadband, `min_pwm`) lives in RAM only. A
-board that resets — power cycle, brown-out, or simply being plugged in — returns to the
-built-in defaults (`App/Src/motor_helper.c`: Kp 0.2, Ki 0.1, alpha 0.2, `u_limit` 100,
-deadband 10, `min_pwm` 50). Note the GUI's default `Limit signal` is 65, not 100.
-
-The host only sends config when someone clicks **Send to all boards** (or when the
-calibration app finishes). The background presence monitor notices a board coming back
-but doesn't re-send its config, so after a reset the board quietly runs on defaults with the
-wrong `min_pwm`.
-
-**Fixed 2026-10-19 (needs flashing + a bench test):** the pong now carries a
-"config received since boot" byte, and the host's background monitor re-sends each board
-the config it last sent it (or the most recent config, for a board never configured)
-whenever a board reports `0`. Detection latency is one presence check of that board — up to
-~6 s with 30 boards present, since each check pings 5 present boards. With old firmware,
-only a board that drops out for 3+ checks and returns gets its config re-sent; a quick
-reset goes unnoticed. Storing config in the on-board EEPROM would remove the need
-entirely, but isn't done.
-
-Still true: nothing is re-sent until someone has clicked **Send to all boards** at least
-once per session.
+The pong reports whether the board has received config since boot; the host re-sends it to
+any board that hasn't. Detection takes up to ~6 s with 30 boards. Nothing is re-sent until
+**Send to all boards** has been clicked once per session. Bench steps: end of
+`CHANGES_2026-10-19.md`.
 
 ### 2. Bus load at 30 boards is predicted at ~70%
 
@@ -57,41 +42,27 @@ telemetry.
   oversampled.
 - Measure first: `cantest/test_comms.py` runs the full 60-frame cycle against however
   many boards are present (the real boards ACK the frames for the absent ones).
-- **CAN FD:** one frame per board at a faster data rate, roughly 20–30% load. Tried
-  2026-06-22 and reverted, possibly only because of the boot-order bug (fixed 2026-08-11) —
-  worth a retry. Needs `fd on dbitrate …` in `can_start_kvaser.sh` as well as the firmware
-  change; the slcan adapter route would stop working.
+- **CAN FD (planned):** one frame per board at a faster data rate, ~20–30% load. Needs a
+  firmware change and `fd on dbitrate …` in `can_start_kvaser.sh`; the slcan adapter would
+  stop working.
 - Sending only changed values is another option.
 
 ### 3. CAN termination — confirm with the board designer
 
 `memos/scheme-parts.md` says the board has a 120 Ω CAN terminator. A CAN bus needs exactly
 two — one at each physical end. If every board has one fitted, they add up in parallel
-(30 boards ≈ 4 Ω) and the bus stops working somewhere around 4–8 boards. This is very likely
-handled by the design (jumper or not fitted on most boards) but isn't documented. **Ask the
+(30 boards ≈ 4 Ω) and the bus stops working somewhere around 4–8 boards. **Ask the
 designer whether the terminator can be disabled per board** before building the full bus.
 
 Quick check: with the board unpowered and the adapter cable on but the Kvaser unplugged,
 measure resistance between pins 2 and 7 of the 9-pin connector. ~120 Ω means fitted.
 
-### 4. A board whose CAN controller goes bus-off stays off the bus — FIXED in code, not yet on hardware
+### 4. Board bus-off recovery — needs flashing + bench test
 
-The PC side recovers from bus-off automatically (`restart-ms 100`), but the boards don't.
-On the STM32G4's FDCAN, bus-off leaves the controller stopped (`CCCR.INIT` set) until
-software clears it, and the firmware has no bus-off handling — no
-`HAL_FDCAN_ErrorStatusCallback`, no `FDCAN_IT_BUS_OFF`. A board that transmits (pong,
-telemetry) while the bus is being disturbed — e.g. another board powering up on a live bus —
-could go bus-off and then silently ignore all commands, holding its last position, until
-someone power-cycles it. Not yet observed (only one board has ever run).
-
-**Fixed 2026-10-19 (needs flashing + a bench test):** `CAN_Check_Bus_Off()`
-(`App/Src/can_helper.c`), called every main-loop iteration, clears `CCCR.INIT` if the
-controller has stopped itself, which starts the standard recovery. Recoveries are counted
-in `can_bus_off_recoveries` (readable with gdb). Config survives this — it's not a reset.
-
-How to test without waiting for a real bus-off: with the board running, halt it in gdb,
-`set *(uint32_t*)0x40006418 |= 1` (FDCAN1 `CCCR.INIT`), continue — the board should keep
-answering pings and `can_bus_off_recoveries` should read 1.
+Without it, a board that goes bus-off ignores all commands until power-cycled.
+`CAN_Check_Bus_Off()` restarts the controller; recoveries are counted in
+`can_bus_off_recoveries`. Test: halt in gdb, `set *(uint32_t*)0x40006418 |= 1`, continue —
+the board should keep answering pings and the counter should read 1.
 
 ### 5. Bit-timing sample point differs (low priority)
 
@@ -100,26 +71,13 @@ The boards sample at 87.5% of the bit (`STM32_code.ioc`: prescaler 10, seg1 13, 
 consider matching them (both ~80–87.5%) — e.g. `ip link set can0 type can bitrate 1000000
 sample-point 0.875` in `can_start_kvaser.sh`.
 
-## CAN behaviour to know about (settled, not bugs)
-
-- **Absent boards are harmless.** CAN acknowledgement isn't addressed — any live board
-  ACKs every frame. Bench-confirmed 2026-10-19.
-- **Nothing alive on the bus → `ERROR-PASSIVE`, not bus-off.** The adapter retries forever
-  and the scan's early stop reports it.
-- **Bus-off happens when a board powers up while the adapter is retrying** — real bit
-  errors. `restart-ms 100` recovers it in 100 ms. This was the cause of the August "board
-  won't connect" problem.
-- **The Kvaser driver can report `BUS-OFF` after recovering** even while traffic flows.
-  Use the TX counter, not the state, as the source of truth.
-- **One-shot mode isn't supported** by this adapter's firmware. Don't re-add it.
-
 ## Firmware performance
 
 ### 6. Control loop runs at ~2 kHz, not the 10 kHz target
 
 `fetch_potentiometer_values()` starts the ADC DMA and busy-waits for it every iteration.
 The real fix is timer-triggered, circular, non-blocking DMA, so the loop always uses the
-latest samples without waiting. The 2026-08-11 change only bounded the wait (to stop hangs).
+latest samples without waiting. Today the wait is only bounded by a 2 ms timeout.
 Measure with `HW_tests/adc_rate_test.py`.
 
 ### 7. Re-tune alpha if the loop rate changes
@@ -142,18 +100,19 @@ Next step: clamp (not rescale) each motor to its calibrated safe range in `limit
 Kept in the repo but not read by any code. Either wire it in (could replace item 8) or
 delete it so nobody edits it expecting an effect.
 
-## From early hardware bring-up — status unknown
+## Controller config
 
-`PROBMELS.md` (December 2025) recorded: the motor driver for channels 13–14 not running even
-though the FPGA output looked correct on a scope, and the 6 V motor rail measuring ~4.5 V.
-Neither has a recorded resolution. Re-check the 6 V rail under load.
+### 10. Put the tuned config into the firmware defaults
 
-**The bench board has only two motors attached.** The June notes found valid pot readings
-only on hardware channels 12 and 13, and the latest calibration
-(`HW_tests/calibrations/latest.json`) is consistent: channels 12 and 13 calibrate cleanly;
-every other channel is flagged suspicious or got no result. So "verified on hardware" in
-this repo means *two motors on one board*. Treat calibration results for other channels as
-meaningless until motors are attached to them.
+The board keeps its controller config in RAM only; the PC re-sends it after a reset
+(item 1). Until that re-send arrives, the board runs on the firmware defaults. Once tuning
+settles, make the tuned values the firmware defaults so a reset board is correct
+immediately. Keep the PC re-send for live tuning.
+
+## Unresolved from bring-up
+
+Motor driver for channels 13–14 didn't run although the FPGA output looked correct; 6 V motor
+rail measured ~4.5 V. Re-check the rail under load.
 
 ## Housekeeping
 
