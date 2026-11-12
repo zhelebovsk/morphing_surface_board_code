@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QPalette
 import os
 
 from config import BOARD_SPACING_MM, MOTOR_SPACING_MM
-from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE, CALIBRATION_FILE
+from config import FUNCTION_DESCRIPTION, UPDATE_HZ, MIN_LIMITS_FILE, CALIBRATION_FILE, DYNAMIC_CYCLE_HZ, DYNAMIC_MAX_HZ
 from gui.calib_window import CalibrationWindow
 
 
@@ -117,7 +117,7 @@ class MainWindow:
         t_layout = QHBoxLayout(t_row)
         t_layout.setContentsMargins(0, 0, 0, 0)
 
-        t_layout.addWidget(QLabel("static t ="))
+        t_layout.addWidget(QLabel("static t [cycles] ="))
         self._static_t = QDoubleSpinBox()
         self._static_t.setRange(-1e9, 1e9)
         self._static_t.setSingleStep(0.1)
@@ -136,12 +136,13 @@ class MainWindow:
         mu_layout = QHBoxLayout(mu_row)
         mu_layout.setContentsMargins(0, 0, 0, 0)
 
-        mu_layout.addWidget(QLabel("μ ="))
+        mu_layout.addWidget(QLabel("μ [Hz] ="))
         self._mu_input = QDoubleSpinBox()
-        self._mu_input.setRange(0.001, 1000.0)
-        self._mu_input.setSingleStep(0.1)
+        self._mu_input.setRange(0.001, DYNAMIC_MAX_HZ)
+        self._mu_input.setSingleStep(0.01)
         self._mu_input.setDecimals(3)
-        self._mu_input.setValue(1.0)
+        self._mu_input.setValue(DYNAMIC_CYCLE_HZ)
+        self._mu_input.setToolTip(f"Wave cycles per second (max {DYNAMIC_MAX_HZ}). Changing it mid-run changes speed without a jump.")
         self._mu_input.valueChanged.connect(self._mu_changed)
         mu_layout.addWidget(self._mu_input)
         mu_layout.addStretch(1)

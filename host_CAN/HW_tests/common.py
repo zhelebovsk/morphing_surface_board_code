@@ -9,7 +9,7 @@ import subprocess
 import socket
 import time
 
-ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "build", "STM32_code.elf")
+ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "firmware", "build", "STM32_code.elf")
 OPENOCD_CFG = ["interface/stlink.cfg", "target/stm32g4x.cfg"]
 OPENOCD_HOST = "localhost"
 OPENOCD_PORT = 4444

@@ -10,11 +10,11 @@ Requirements:
   - openocd installed and on PATH
   - arm-none-eabi-nm installed and on PATH
   - ST-LINK connected to the board
-  - Firmware built (build/STM32_code.elf must exist)
+  - Firmware built (firmware/build/STM32_code.elf must exist)
   - Firmware running on the board
 
 Usage:
-  cd HW_tests && python3 adc_rate_test.py
+  cd host_CAN/HW_tests && python3 adc_rate_test.py
 """
 
 import json
@@ -27,7 +27,7 @@ from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "build", "STM32_code.elf")
+ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "firmware", "build", "STM32_code.elf")
 
 OPENOCD_CFG_FILES = ["interface/stlink.cfg", "target/stm32g4x.cfg"]
 OPENOCD_HOST = "localhost"
@@ -263,7 +263,7 @@ def main():
 
     # 2. Hardware measurement
     if not os.path.exists(ELF_PATH):
-        msg = f"ELF not found at '{ELF_PATH}'. Build the firmware first ('make')."
+        msg = f"ELF not found at '{ELF_PATH}'. Build the firmware first ('make -C firmware')."
         print(f"\n[2/2] Hardware measurement skipped: {msg}")
         results["error"] = msg
     else:

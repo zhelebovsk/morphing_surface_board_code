@@ -8,7 +8,7 @@ each board finishes — no button press required.
 No OpenOCD / ST-LINK needed — initial positions read via CAN stream.
 
 Usage:
-    cd HW_tests
+    cd host_CAN/HW_tests
     python calibration_app.py
 """
 
@@ -43,7 +43,7 @@ CALIBRATION_DIR = os.path.join(os.path.dirname(__file__), "calibrations")
 
 # Sent to each board after calibration to restore normal running config.
 # Keep in sync with the "Board config packet" slider defaults in
-# cantest/gui/main_window.py — these two are not currently loaded from a
+# host_CAN/gui/main_window.py — these two are not currently loaded from a
 # shared source, so a change to one won't automatically apply to the other.
 _RUNNING_CONFIG = [51, 26, 0, 51, 65, 10]  # Kp Ki Kd alpha u_limit deadband
 
@@ -988,7 +988,7 @@ class CalibrationApp(QMainWindow):
         with open(path, "w") as f:
             json.dump(out, f, indent=2)
 
-        # cantest reads only this stable filename — the timestamped file
+        # host_CAN reads only this stable filename — the timestamped file
         # above is kept purely as a history/audit trail.
         latest_path = os.path.join(CALIBRATION_DIR, "latest.json")
         with open(latest_path, "w") as f:

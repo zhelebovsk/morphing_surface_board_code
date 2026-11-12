@@ -4,7 +4,7 @@
         {
             "name": "Debug STM32G474RETx",
             "cwd": "${workspaceRoot}",
-            "executable": "${workspaceRoot}/build/STM32_code.elf",
+            "executable": "${workspaceRoot}/firmware/build/STM32_code.elf",
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "openocd",

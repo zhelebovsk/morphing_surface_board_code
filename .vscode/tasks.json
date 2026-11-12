@@ -4,7 +4,7 @@
         {
             "label": "Build project",
             "type": "shell",
-            "command": "make",
+            "command": "make -C firmware",
             "group": "build"
         },
         {

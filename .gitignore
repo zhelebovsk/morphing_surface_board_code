@@ -33,23 +33,23 @@ _*/
 
 
 # --- Lattice FPGA: Keep Source, Ignore Artifacts ---
-lattice_code/*/
-!lattice_code/
-!lattice_code/*.v      # Keep Verilog source
-!lattice_code/*.lpf    # Keep Pin Assignments (Constraints)
-!lattice_code/*.ldf    # Keep Lattice Project File
-!lattice_code/*.ccl    # Keep Communication Constraint files
-!lattice_code/*.sty    # Keep Strategy files
+fpga/*/
+!fpga/
+!fpga/*.v      # Keep Verilog source
+!fpga/*.lpf    # Keep Pin Assignments (Constraints)
+!fpga/*.ldf    # Keep Lattice Project File
+!fpga/*.ccl    # Keep Communication Constraint files
+!fpga/*.sty    # Keep Strategy files
 
 # Ignore specific Lattice noise
-lattice_code/impl1/
-lattice_code/sim/
-lattice_code/test/
-lattice_code/transcript
-lattice_code/*.dir/
-lattice_code/*.html
-lattice_code/*.xml
-lattice_code/*.log
+fpga/impl1/
+fpga/sim/
+fpga/test/
+fpga/transcript
+fpga/*.dir/
+fpga/*.html
+fpga/*.xml
+fpga/*.log
 
 # --- Python / Data ---
 __pycache__/
@@ -60,6 +60,9 @@ __pycache__/
 backups/
 
 # Calibration run history: keep only the stable "latest" pointer
-HW_tests/calibrations/*.json
-!HW_tests/calibrations/latest.json
+host_CAN/HW_tests/calibrations/*.json
+!host_CAN/HW_tests/calibrations/latest.json
 
+
+# Lattice Diamond editor state
+fpga/.*.ini

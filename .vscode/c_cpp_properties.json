@@ -4,18 +4,18 @@
             "name": "STM32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/Core/Inc",
-                "${workspaceFolder}/Core/Src",
-                "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc",
-                "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy",
-                "${workspaceFolder}/Drivers/CMSIS/Include",
-                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32G4xx/Include",
-                "${workspaceFolder}/USB_Device/App",
-                "${workspaceFolder}/Drivers/**",
-                "${workspaceFolder}/Middlewares/**",
-                "${workspaceFolder}/USB_Device/**",
-                "${workspaceFolder}/App/Inc/",
-                "${workspaceFolder}/App/Src/"
+                "${workspaceFolder}/firmware/Core/Inc",
+                "${workspaceFolder}/firmware/Core/Src",
+                "${workspaceFolder}/firmware/Drivers/STM32G4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/firmware/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy",
+                "${workspaceFolder}/firmware/Drivers/CMSIS/Include",
+                "${workspaceFolder}/firmware/Drivers/CMSIS/Device/ST/STM32G4xx/Include",
+                "${workspaceFolder}/firmware/USB_Device/App",
+                "${workspaceFolder}/firmware/Drivers/**",
+                "${workspaceFolder}/firmware/Middlewares/**",
+                "${workspaceFolder}/firmware/USB_Device/**",
+                "${workspaceFolder}/firmware/App/Inc/",
+                "${workspaceFolder}/firmware/App/Src/"
             ],
             "defines": [
                 "USE_HAL_DRIVER",
@@ -27,10 +27,10 @@
             "intelliSenseMode": "linux-gcc-arm",
             "browse": {
                 "path": [
-                    "${workspaceFolder}/Core",
-                    "${workspaceFolder}/Drivers",
-                    "${workspaceFolder}/App",
-                    "${workspaceFolder}/USB_Device"
+                    "${workspaceFolder}/firmware/Core",
+                    "${workspaceFolder}/firmware/Drivers",
+                    "${workspaceFolder}/firmware/App",
+                    "${workspaceFolder}/firmware/USB_Device"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""

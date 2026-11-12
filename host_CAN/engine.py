@@ -2,7 +2,7 @@ import queue
 import threading
 import time
 
-from config import BOARD_COUNT, MOTORS_PER_BOARD, REFACTORING, DYNAMIC_CYCLE_HZ, BLINK_DURATION_SEC, UPDATE_HZ
+from config import BOARD_COUNT, MOTORS_PER_BOARD, REFACTORING, DYNAMIC_CYCLE_HZ, DYNAMIC_MAX_HZ, BLINK_DURATION_SEC, UPDATE_HZ
 from wingcontrol import WingControl
 from communication import MotorCommunication
 from utils import clamp8
@@ -58,6 +58,7 @@ class ControlMotor:
         # dynamic-only state
         self.dynamic_t = 0.0
         self.dynamic_mu = DYNAMIC_CYCLE_HZ
+        self.dynamic_cycles = 0.0
         self.dynamic_phi = 0.0
         self.dynamic_N = 0
         self._blink_until = 0.0
@@ -69,6 +70,7 @@ class ControlMotor:
         return self.communication.scale_value(board, motor, raw_value)
 
     def run_static(self, t):
+        # t in wave cycles, like motor_function
         # static preview only; does not change dynamic timer state
         self.wing_control.fill_from_function(motor_function, t=t)
         self.communication.send_positions(self.wing_control.locations)
@@ -91,7 +93,9 @@ class ControlMotor:
                 t = self.step_index * self.UPDATE_DT
                 self.dynamic_t = t
 
-                cycles = t * self.dynamic_mu
+                # Accumulated, not t * μ, so changing μ mid-run changes speed
+                # without making the wave (and the motors) jump.
+                cycles = self.dynamic_cycles
                 cycle_index = int(cycles)
                 phi = cycles - cycle_index
 
@@ -102,7 +106,7 @@ class ControlMotor:
                 self.dynamic_N = cycle_index
                 self.dynamic_phi = phi
 
-            self.wing_control.fill_from_function(motor_function, t=t)
+            self.wing_control.fill_from_function(motor_function, t=cycles)
             locations = self.wing_control.locations
 
             t0 = time.perf_counter()
@@ -127,6 +131,7 @@ class ControlMotor:
             with self._lock:
                 self.step_index += 1
                 self.dynamic_t = self.step_index * self.UPDATE_DT
+                self.dynamic_cycles += self.dynamic_mu * self.UPDATE_DT
 
             next_time = max(next_time + self.UPDATE_DT, time.perf_counter())
             sleep_for = next_time - time.perf_counter()
@@ -175,6 +180,7 @@ class ControlMotor:
         with self._lock:
             self.step_index = 0
             self.dynamic_t = 0.0
+            self.dynamic_cycles = 0.0
             self.dynamic_phi = 0.0
             self.dynamic_N = 0
             self._blink_until = 0.0
@@ -193,7 +199,7 @@ class ControlMotor:
 
     def set_dynamic_mu(self, mu):
         with self._lock:
-            self.dynamic_mu = max(0.001, float(mu))
+            self.dynamic_mu = min(max(0.001, float(mu)), DYNAMIC_MAX_HZ)
 
 
     def drain_frame_queue(self):

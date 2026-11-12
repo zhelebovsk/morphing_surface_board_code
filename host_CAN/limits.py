@@ -53,7 +53,7 @@ def save_limit_file(path, limits):
 def load_min_pwm(path, board_count, default):
     """min_pwm is a per-board value in the firmware protocol (set_controller
     applies it to every motor on a board), so unlike the position limits this
-    is a flat list, not per-motor. Written by HW_tests/calibration_app.py."""
+    is a flat list, not per-motor. Written by host_CAN/HW_tests/calibration_app.py."""
     pwm_by_board = [default] * board_count
 
     if not os.path.exists(path):

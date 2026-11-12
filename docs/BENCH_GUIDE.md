@@ -12,7 +12,7 @@ pip install python-can PySide6 numpy
 ```
 
 - Use `gdb-multiarch` for debugging (`arm-none-eabi-gdb` is not what this setup uses).
-- STM32CubeMX is only needed to change peripheral configuration (`STM32_code.ioc`) — see
+- STM32CubeMX is only needed to change peripheral configuration (`firmware/STM32_code.ioc`) — see
   [Editing the CubeMX project](#editing-the-cubemx-project) below.
 - Lattice Diamond is only needed to reprogram the FPGA.
 
@@ -27,9 +27,9 @@ pip install python-can PySide6 numpy
 ## Build and flash
 
 ```bash
-make -j4                 # → build/STM32_code.elf / .bin
+make -C firmware -j4     # → firmware/build/STM32_code.elf / .bin
 ./run.sh                 # builds, then flashes over ST-LINK with openocd and resets
-# alternative: st-flash write build/STM32_code.bin 0x08000000
+# alternative: st-flash write firmware/build/STM32_code.bin 0x08000000
 ```
 
 After reset the board samples its pots for ~1 s and holds every motor where it is.
@@ -69,7 +69,7 @@ cansend can0 101#06             # ping board 1 by hand → candump shows a reply
 ## Run the control GUI
 
 ```bash
-cd cantest
+cd host_CAN
 python main.py
 ```
 
@@ -84,13 +84,13 @@ python main.py
    when you send this. After that, the app re-sends it automatically to any board that
    resets (terminal: *"Re-sending controller config to board(s) …"*).
 4. **Run statically** (one frame at time *t*) or **Start dynamic** (continuous at
-   `UPDATE_HZ`, speed set by μ).
-5. To change what the surface does, edit `motor_function()` in `cantest/function.py`.
+   `UPDATE_HZ`, speed set by μ in wave cycles per second, default 0.1, max 0.5).
+5. To change what the surface does, edit `motor_function()` in `host_CAN/function.py`.
 
 Calibration controls in the main window:
-- **Edit limits** — table editor for `cantest/motor_min.csv` (each motor's lowest allowed
+- **Edit limits** — table editor for `host_CAN/motor_min.csv` (each motor's lowest allowed
   position byte; the usable range is `min .. min + MOTOR_RANGE`).
-- **Reload limits** — re-read `motor_min.csv` and `HW_tests/calibrations/latest.json`.
+- **Reload limits** — re-read `motor_min.csv` and `host_CAN/HW_tests/calibrations/latest.json`.
   The GUI also auto-reloads when either file changes.
 
 The first position command after startup moves every motor to the commanded shape at
@@ -98,7 +98,7 @@ once, from wherever it was holding; make sure nothing is near a mechanical stop.
 
 ## Settings
 
-**Host — `cantest/config.py`** (restart the GUI after changing):
+**Host — `host_CAN/config.py`** (restart the GUI after changing):
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -111,27 +111,27 @@ once, from wherever it was holding; make sure nothing is near a mechanical stop.
 
 **Board controller — from the GUI**, "Board config packet" bar: Kp, Ki, Kd, filter alpha,
 PWM limit, deadband, `min_pwm` (per board, from calibration). The firmware defaults in
-`App/Src/motor_helper.c` apply only until a config is sent. Ranges and scaling:
+`firmware/App/Src/motor_helper.c` apply only until a config is sent. Ranges and scaling:
 [CAN_PROTOCOL.md](CAN_PROTOCOL.md#0x03--controller-config).
 
 **Board ID** — the DIP switch, read once at power-up.
 
 ## Calibrate motors
 
-See `HW_tests/CALIBRATION.md`. Short version: close the GUI, then
+See `host_CAN/HW_tests/CALIBRATION.md`. Short version: close the GUI, then
 
 ```bash
-cd HW_tests && python calibration_app.py
+cd host_CAN/HW_tests && python calibration_app.py
 ```
 
 It finds each motor's `min_pwm`, flags suspicious channels (wrong direction, not attached),
-writes `HW_tests/calibrations/latest.json` and sends the result to the boards. Commit
+writes `host_CAN/HW_tests/calibrations/latest.json` and sends the result to the boards. Commit
 `latest.json` when you're happy with a run (timestamped runs are git-ignored).
 
 ## Editing the CubeMX project
 
 Only needed to change pins, peripherals or clocks — building, flashing and running never
-touch CubeMX. Open `STM32_code.ioc` in STM32CubeMX and regenerate; Core/ is only safe to
+touch CubeMX. Open `firmware/STM32_code.ioc` in STM32CubeMX and regenerate; firmware/Core/ is only safe to
 edit inside `USER CODE` blocks, since regeneration overwrites everything else.
 
 Try the plain way first:
@@ -189,13 +189,13 @@ journalctl -k | grep can0
 | Motor never moves, its pot reads ~4095 | Pot not connected; firmware hard stop keeps it off. |
 | Motor runs away from its target | Pot/motor polarity reversed on that channel. Calibration app flags this as "suspicious". |
 | Board hangs at boot | Historically the ADC DMA wait (fixed 2026-08-11, now bounded). Attach with OpenOCD + `gdb-multiarch` to see where it's stuck. |
-| GUI won't start / import error | Check `git diff cantest/` for stray edits — this has happened. |
+| GUI won't start / import error | Check `git diff host_CAN/` for stray edits — this has happened. |
 
 ### Live debugging
 
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32g4x.cfg
-gdb-multiarch build/STM32_code.elf -ex "target extended-remote :3333"
+gdb-multiarch firmware/build/STM32_code.elf -ex "target extended-remote :3333"
 ```
 
 Useful variables: `pot_raw`, `pot_filtered`, `desired_position`, `motor_speeds`,
