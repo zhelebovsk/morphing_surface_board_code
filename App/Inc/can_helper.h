@@ -7,10 +7,10 @@
 #include "motor_helper.h"
 #include "timer_helper.h"
 
-// 0 = classic CAN (default). 1 = CAN FD with bit-rate switching: 1 Mbit/s
-// arbitration, 2 Mbit/s data. Needed on every board before the bus runs on
-// `./can_start_kvaser.sh fd` (docs/OPEN_ISSUES.md #2).
-#define CAN_FD_ENABLED 0
+// 1 = CAN FD with bit-rate switching: 1 Mbit/s arbitration, 2 Mbit/s data. Still
+// works on a classic bus. Needed on every board before the bus runs on
+// `./can_start_kvaser.sh fd` (docs/OPEN_ISSUES.md #2). 0 = classic only.
+#define CAN_FD_ENABLED 1
 
 void CAN_Configure_FD(void);
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len);

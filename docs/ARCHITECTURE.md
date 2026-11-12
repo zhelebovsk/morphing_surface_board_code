@@ -23,7 +23,7 @@ If the CANBUS goes quiet, boards keep holding their last setpoint.
 
 **Note:** the PC computes the shape for all boards to guaranty all boards move in sync.
 
-**Note:** using classic CAN currently; a move to CAN FD is planned (OPEN_ISSUES #2).
+**Note:** classic CAN by default; CAN FD halves bus time and is bench-tested on one board (OPEN_ISSUES #2).
 
 ## Board hardware (summary)
 

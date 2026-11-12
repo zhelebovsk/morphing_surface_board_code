@@ -1,7 +1,7 @@
 # CAN Protocol
 
-Classic CAN, **1 Mbit/s**, standard 11-bit IDs, 8-byte max payload (CAN FD planned,
-OPEN_ISSUES #2).
+Classic CAN, **1 Mbit/s**, standard 11-bit IDs, 8-byte max payload. Optional CAN FD with a
+2 Mbit/s data phase for position frames (`0x07`, OPEN_ISSUES #2).
 Source of truth: `App/Src/can_helper.c` (board side), `cantest/communication.py` (host side).
 
 ## Addressing
@@ -55,7 +55,7 @@ absent.
 
 Same `p` bytes as `0x01`/`0x02`, all 14 in one frame. Sent instead of `0x01`/`0x02` when
 `can0` is in FD mode (`./can_start_kvaser.sh fd`, detected from its MTU); the board accepts
-it only when built with `CAN_FD_ENABLED 1` (OPEN_ISSUES #2). Data phase is 2 Mbit/s. A board
+it when built with `CAN_FD_ENABLED 1`, the default (OPEN_ISSUES #2). Data phase is 2 Mbit/s. A board
 built without it ignores FD frames without disturbing the bus (protocol exception handling
 is enabled).
 

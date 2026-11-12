@@ -2,7 +2,7 @@
 # Bring up can0 via Kvaser Leaf v3 (uses kvaser_usb kernel module — no slcand needed).
 # Run once after plugging in the Kvaser. The device appears as can0 automatically.
 #
-#   ./can_start_kvaser.sh       classic CAN, 1 Mbit/s (default)
+#   ./can_start_kvaser.sh       classic CAN, 1 Mbit/s (default), 87.5% sample point like the boards
 #   ./can_start_kvaser.sh fd    CAN FD: 1 Mbit/s arbitration, 2 Mbit/s data. Only with
 #                               firmware built with CAN_FD_ENABLED 1. The host app detects
 #                               FD mode from the interface (docs/OPEN_ISSUES.md #2).
@@ -41,11 +41,13 @@ sudo ip link set can0 txqueuelen 1000
 # their last commanded position. Cost is ~100 ms, i.e. ~10 dropped frames at
 # the 100 Hz command rate.
 if [ "$1" = "fd" ]; then
-    # Data phase matches the board: 2 Mbit/s, 80% sample point.
-    sudo ip link set can0 up type can bitrate 1000000 dbitrate 2000000 dsample-point 0.8 \
-        fd on restart-ms 100
+    # Sample points must match the board (87.5% / 80%): at the Kvaser default of 75%
+    # the board rejects most FD frames (docs/OPEN_ISSUES.md #2).
+    sudo ip link set can0 up type can bitrate 1000000 sample-point 0.875 \
+        dbitrate 2000000 dsample-point 0.8 fd on restart-ms 100
     echo "CAN interface can0 is up (Kvaser, CAN FD)"
 else
-    sudo ip link set can0 up type can bitrate 1000000 restart-ms 100
+    # fd off: ip otherwise keeps FD on from a previous `fd` run.
+    sudo ip link set can0 up type can bitrate 1000000 sample-point 0.875 fd off restart-ms 100
     echo "CAN interface can0 is up (Kvaser)"
 fi
