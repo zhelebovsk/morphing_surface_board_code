@@ -36,8 +36,8 @@ hostCan/               PC control app (Python, PySide6, python-can). Entry: main
   HW_tests/            Hardware test & calibration tools (calibration_app.py etc.)
 fpga/                  Verilog for the on-board Lattice FPGA (PWM/DIR forwarding)
 docs/                  Guides (above), changes/ session logs, hardware/ bring-up notes
-can_start_kvaser.sh    Bring up can0 on the Kvaser adapter  ← the one in daily use
-can_start.sh           Bring up can0 via an slcan (serial) adapter instead
+can_start_kvaser.sh    Bring up can0 on the Kvaser adapter (arg fd = CAN FD)  ← the one in daily use
+can_start.sh           Bring up can0 via an slcan (serial) adapter instead, classic CAN only
 run.sh                 Build + flash over ST-LINK (openocd)
-cube.zsh               Optional CubeMX launcher (see BENCH_GUIDE)
+cube.sh                Optional CubeMX launcher (see BENCH_GUIDE)
 ```

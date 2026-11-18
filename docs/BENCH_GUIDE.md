@@ -39,9 +39,16 @@ After reset the board samples its pots for ~1 s and holds every motor where it i
 Once per Kvaser plug-in (needs sudo):
 
 ```bash
-./can_start_kvaser.sh
+./can_start_kvaser.sh fd        # CAN FD (recommended); plain ./can_start_kvaser.sh for classic CAN
 ip -details link show can0      # expect: "can state ERROR-ACTIVE restart-ms 100"
 ```
+
+**Classic or FD:** the boards reply in classic CAN either way, so the choice only sets how
+the host sends positions. FD halves the bus load (one frame per board instead of two). It
+needs every board on the bus flashed with current firmware (`CAN_FD_ENABLED 1`), because a
+board on older firmware can freeze the whole bus; when unsure, use classic. The GUI picks
+the mode up from `can0` at start, so restart it after switching. Details:
+[OPEN_ISSUES.md #2](OPEN_ISSUES.md).
 
 `restart-ms 100` is essential: `can0` recovers by itself 100 ms after a bus-off.
 
@@ -70,7 +77,7 @@ cansend can0 101#06             # ping board 1 by hand → candump shows a reply
 
 ```bash
 cd hostCan
-python main.py
+python3 main.py
 ```
 
 1. Choose `can0` (or `DEMO-MODE` to run without hardware) → **Start**.
@@ -121,7 +128,7 @@ PWM limit, deadband, `min_pwm` (per board, from calibration). The firmware defau
 See `hostCan/HW_tests/CALIBRATION.md`. Short version: close the GUI, then
 
 ```bash
-cd hostCan/HW_tests && python calibration_app.py
+cd hostCan/HW_tests && python3 calibration_app.py
 ```
 
 It finds each motor's `min_pwm`, flags suspicious channels (wrong direction, not attached),
@@ -141,7 +148,7 @@ cubemx            # or however STM32CubeMX is installed on your machine
 ```
 
 If its window renders badly (blank or frozen panels, common under Wayland), use
-`./cube.zsh` instead. It runs CubeMX inside a nested X window: Xephyr, with openbox as the
+`./cube.sh` instead. It runs CubeMX inside a nested X window: Xephyr, with openbox as the
 window manager. Needs `sudo apt install xserver-xephyr openbox`, assumes `cubemx` is on
 the PATH and a 1920×1080 window; Xephyr and openbox keep running after you close CubeMX,
 so close the Xephyr window too.

@@ -9,6 +9,11 @@
 
 sudo modprobe kvaser_usb 2>/dev/null
 
+if ! ip link show can0 >/dev/null 2>&1; then
+    echo "ERROR: can0 not found. Is the Kvaser plugged in? (check: lsusb | grep -i kvaser)" >&2
+    exit 1
+fi
+
 sudo ip link set can0 down 2>/dev/null
 sudo ip link set can0 txqueuelen 1000
 
@@ -44,10 +49,12 @@ if [ "$1" = "fd" ]; then
     # Sample points must match the board (87.5% / 80%): at the Kvaser default of 75%
     # the board rejects most FD frames (docs/OPEN_ISSUES.md #2).
     sudo ip link set can0 up type can bitrate 1000000 sample-point 0.875 \
-        dbitrate 2000000 dsample-point 0.8 fd on restart-ms 100
+        dbitrate 2000000 dsample-point 0.8 fd on restart-ms 100 || {
+        echo "ERROR: failed to bring up can0 (see the ip error above)" >&2; exit 1; }
     echo "CAN interface can0 is up (Kvaser, CAN FD)"
 else
     # fd off: ip otherwise keeps FD on from a previous `fd` run.
-    sudo ip link set can0 up type can bitrate 1000000 sample-point 0.875 fd off restart-ms 100
+    sudo ip link set can0 up type can bitrate 1000000 sample-point 0.875 fd off restart-ms 100 || {
+        echo "ERROR: failed to bring up can0 (see the ip error above)" >&2; exit 1; }
     echo "CAN interface can0 is up (Kvaser)"
 fi
