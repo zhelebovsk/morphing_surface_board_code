@@ -72,7 +72,7 @@ erase them on regeneration.
 
 ### Control loop — `control_loop()`
 
-Called from the main loop, at most every 100 µs (~2 kHz in practice). Covers all 16 hardware
+Called from the main loop, at most every 100 µs (~7.5 kHz measured). Covers all 16 hardware
 channels; the 2 unused ones have no pot, read ~4095, and are always held off by the hard stop.
 Each pass:
 
@@ -91,8 +91,8 @@ Each pass:
 6. **Output:** sign → DIR pin, magnitude → PWM compare (0..255, ~52 kHz PWM).
 7. `CAN_Stream_Update()` sends a telemetry frame if streaming is on and the interval elapsed.
 
-Runs at ~2 kHz, not the 10 kHz target, because the ADC wait blocks (OPEN_ISSUES #6). Alpha
-is tuned for 2 kHz.
+Runs at ~7.5 kHz (one pass ≈ 134 µs, measured with `adc_rate_test.py`), not the 10 kHz
+target (OPEN_ISSUES #6).
 
 CAN reception is interrupt-driven (`HAL_FDCAN_RxFifo0Callback`) and only updates setpoints
 and config variables; it never touches the motors directly.
@@ -121,7 +121,7 @@ Python 3, PySide6, python-can (socketcan backend), numpy. Linux only (uses socke
 | `limits.py` | Loads `motor_min.csv` and per-board `min_pwm` from the latest calibration |
 | `gui/main_window.py` | Main window: grid of motor values, run controls, config sliders |
 | `gui/calib_window.py` | "Edit limits" table editor for `motor_min.csv` |
-| `test_comms.py` | Bench test: full 30-board send cycle against however many boards exist |
+| `test_comms.py` | Bench test for any number of boards: full 30-slot send load (or `--present-only`), checks frames reached the bus, bus errors, boards still answering |
 
 Choosing **DEMO-MODE** in the channel picker runs everything without hardware.
 

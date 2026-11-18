@@ -38,15 +38,15 @@ OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "adc_rate_results.json")
 
 # ── Theoretical calculation ───────────────────────────────────────────────────
 # From adc.c and SystemClock_Config in main.c:
-#   HSE /2 * 40 /2 = 170 MHz SYSCLK
-#   ADC12 clock source = SYSCLK, prescaler = DIV4 → 42.5 MHz ADC clock
+#   HSE 16 MHz /2 * 40 /2 = 160 MHz SYSCLK
+#   ADC12 clock source = SYSCLK, prescaler = DIV4 → 40 MHz ADC clock
 #   Sampling time = ADC_SAMPLETIME_24CYCLES_5 = 24.5 cycles
 #   12-bit resolution → 12.5 conversion cycles
 #   Total per channel = 37 cycles
 
-SYSCLK_HZ         = 170_000_000
+SYSCLK_HZ         = 160_000_000
 ADC_PRESCALER     = 4
-ADC_CLOCK_HZ      = SYSCLK_HZ / ADC_PRESCALER   # 42.5 MHz
+ADC_CLOCK_HZ      = SYSCLK_HZ / ADC_PRESCALER   # 40 MHz
 SAMPLING_CYCLES   = 24.5
 CONVERSION_CYCLES = 12.5
 CYCLES_PER_CH     = SAMPLING_CYCLES + CONVERSION_CYCLES  # 37
@@ -65,8 +65,8 @@ ADC2_TIME_US      = (ADC2_CYCLES / ADC_CLOCK_HZ) * 1e6
 BOTTLENECK_US     = max(ADC1_TIME_US, ADC2_TIME_US)
 THEORETICAL_MAX_HZ = 1e6 / BOTTLENECK_US
 
-# From main.c: control_loop() called every 500 µs → 2000 Hz actual rate
-CONTROL_LOOP_US   = 500
+# From main.c: control_loop() called at most every 100 µs → 10 kHz ceiling
+CONTROL_LOOP_US   = 100
 CONTROL_LOOP_HZ   = 1e6 / CONTROL_LOOP_US
 
 
@@ -88,8 +88,8 @@ def compute_theoretical():
         "note": (
             f"ADC1 is the bottleneck ({ADC1_CHANNELS} ch). "
             f"Hardware can do {THEORETICAL_MAX_HZ:.0f} Hz, but the control loop "
-            f"in main.c only triggers every {CONTROL_LOOP_US} µs → "
-            f"{CONTROL_LOOP_HZ:.0f} Hz actual rate."
+            f"in main.c runs at most every {CONTROL_LOOP_US} µs → "
+            f"{CONTROL_LOOP_HZ:.0f} Hz ceiling; the measurement shows the real rate."
         ),
     }
 
@@ -259,7 +259,7 @@ def main():
     print(f"  ADC1 sequence:      {th['adc1_sequence_us']} µs  ({th['adc1_channels']} channels)")
     print(f"  ADC2 sequence:      {th['adc2_sequence_us']} µs  ({th['adc2_channels']} channels)")
     print(f"  Theoretical max:    {th['theoretical_max_hz']} Hz  (complete 16-motor read)")
-    print(f"  Control loop limit: {th['control_loop_hz']:.0f} Hz  (every {CONTROL_LOOP_US} µs in main.c)")
+    print(f"  Control loop max:   {th['control_loop_hz']:.0f} Hz  (at most every {CONTROL_LOOP_US} µs in main.c)")
 
     # 2. Hardware measurement
     if not os.path.exists(ELF_PATH):

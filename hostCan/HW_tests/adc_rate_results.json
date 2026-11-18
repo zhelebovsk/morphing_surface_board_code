@@ -1,21 +1,27 @@
 {
-  "timestamp": "2026-10-19T14:29:07.601751",
+  "timestamp": "2026-11-18T14:05:37.993961",
   "theoretical": {
-    "sysclk_mhz": 170.0,
-    "adc_clock_mhz": 42.5,
+    "sysclk_mhz": 160.0,
+    "adc_clock_mhz": 40.0,
     "sampling_cycles": 24.5,
     "conversion_cycles": 12.5,
     "cycles_per_channel": 37.0,
     "adc1_channels": 13,
     "adc2_channels": 3,
-    "adc1_sequence_us": 11.318,
-    "adc2_sequence_us": 2.612,
+    "adc1_sequence_us": 12.025,
+    "adc2_sequence_us": 2.775,
     "bottleneck_adc": "ADC1",
-    "bottleneck_us": 11.318,
-    "theoretical_max_hz": 88357.6,
-    "control_loop_hz": 2000.0,
-    "note": "ADC1 is the bottleneck (13 ch). Hardware can do 88358 Hz, but the control loop in main.c only triggers every 500 \u00b5s \u2192 2000 Hz actual rate."
+    "bottleneck_us": 12.025,
+    "theoretical_max_hz": 83160.1,
+    "control_loop_hz": 10000.0,
+    "note": "ADC1 is the bottleneck (13 ch). Hardware can do 83160 Hz, but the control loop in main.c runs at most every 100 \u00b5s \u2192 10000 Hz ceiling; the measurement shows the real rate."
   },
-  "measured": null,
-  "error": "Could not connect to OpenOCD telnet: [Errno 111] Connection refused"
+  "measured": {
+    "conv_counter_start": 16844925,
+    "conv_counter_end": 16859797,
+    "delta_conversions": 14872,
+    "elapsed_sec": 2.0002,
+    "actual_hz": 7435.13
+  },
+  "error": null
 }

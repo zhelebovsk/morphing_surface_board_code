@@ -102,18 +102,21 @@ while the PID loop is stopped.
 
 ## Firmware performance
 
-### 6. Control loop runs at ~2 kHz, not the 10 kHz target
+### 6. Control loop runs at ~7.5 kHz, not the 10 kHz target
 
-`fetch_potentiometer_values()` starts the ADC DMA and busy-waits for it every iteration.
-The real fix is timer-triggered, circular, non-blocking DMA, so the loop always uses the
-latest samples without waiting. Today the wait is only bounded by a 2 ms timeout.
-Measure with `hostCan/HW_tests/adc_rate_test.py`.
+Measured 7.45 kHz (one pass ≈ 134 µs) with `hostCan/HW_tests/adc_rate_test.py`. The ADC
+conversion itself is only ~12 µs of that; where the rest goes hasn't been profiled. Low
+priority: motor mechanical bandwidth is under 20 Hz.
+
+- `fetch_potentiometer_values()` still starts the ADC DMA and busy-waits for it every pass
+  (bounded by a 2 ms timeout). Timer-triggered, circular, non-blocking DMA would remove that
+  wait and give a steady sample rate.
 
 ### 7. Re-tune alpha if the loop rate changes
 
-alpha 0.1–0.3 is right at 2 kHz (cut-off ~34–110 Hz). At 10 kHz the same alpha passes ~5×
-higher frequencies; it would need ~0.04–0.06 — but firmware clamps alpha to ≥ 0.1, so that
-clamp would need changing too.
+Cut-off `fc = −fs·ln(1−alpha)/(2π)`. At the measured ~7.5 kHz, the default alpha 0.2 gives
+~265 Hz (alpha 0.1: ~125 Hz), still far above the motors' < 20 Hz. A ~70 Hz cut-off would need
+alpha ≈ 0.06, but firmware clamps alpha to ≥ 0.1, so that clamp would need changing too.
 
 ## Calibration & limits
 
