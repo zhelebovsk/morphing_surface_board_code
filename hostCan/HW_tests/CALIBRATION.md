@@ -3,13 +3,13 @@
 Finds `min_pwm` (stiction threshold) and step-response characteristics per motor. Runs over CAN only — no ST-LINK needed.
 
 ## Prerequisites
-- Firmware running, CAN interface up (`sudo bash ../can_start_kvaser.sh`)
-- Cantest GUI **not** running
+- Firmware running, CAN interface up (`./can_start_kvaser.sh fd` from the repo root)
+- Main GUI (`hostCan/main.py`) **not** running
 
 ## Run
 ```bash
 cd hostCan/HW_tests
-python calibration_app.py
+python3 calibration_app.py
 ```
 
 ## Parameters

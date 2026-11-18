@@ -28,7 +28,7 @@ class ControlMotor:
         self.communication.scan_boards(board_count)
 
         from limits import load_all_limits
-        _, _, self.min_pwm_by_board = load_all_limits()
+        _, self.min_pwm_by_board = load_all_limits()
 
         # Config last sent to each board via send_config(), re-sent by the
         # monitor loop to any board that reset since. A board that never got
@@ -213,7 +213,7 @@ class ControlMotor:
 
     def reload_limits(self):
         from limits import load_all_limits
-        min_limits, _, min_pwm_by_board = load_all_limits()
+        min_limits, min_pwm_by_board = load_all_limits()
         self.communication.min_limits = min_limits
         self.min_pwm_by_board = min_pwm_by_board
 

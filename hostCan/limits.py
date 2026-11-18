@@ -2,7 +2,7 @@ import os
 import csv
 import json
 from config import (
-    BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT, MOTOR_RANGE,
+    BOARD_COUNT, MOTORS_PER_BOARD, MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT,
     CALIBRATION_FILE, DEFAULT_MIN_PWM,
 )
 from utils import clamp8
@@ -80,10 +80,7 @@ def load_min_pwm(path, board_count, default):
 
 
 def load_all_limits():
+    # Each motor's top is min + MOTOR_RANGE, capped at 255 (communication.scale_value).
     min_limits = load_limit_file(MIN_LIMITS_FILE, DEFAULT_MIN_LIMIT)
-    max_limits = [
-        [min(min_limits[board][motor] + MOTOR_RANGE, 255) for motor in range(MOTORS_PER_BOARD)]
-        for board in range(BOARD_COUNT)
-    ]
     min_pwm_by_board = load_min_pwm(CALIBRATION_FILE, BOARD_COUNT, DEFAULT_MIN_PWM)
-    return min_limits, max_limits, min_pwm_by_board
+    return min_limits, min_pwm_by_board

@@ -153,7 +153,7 @@ motor_function(x_mm, y_mm, t)                   ∈ [−1, 1]    t in cycles, ad
 → ADC setpoint = 1048 + byte·7                   clamped [680, 3415]   firmware
 ```
 
-`motor_max.csv` is not used (OPEN_ISSUES #9). `REFACTORING` in `config.py` must stay `True`;
+`REFACTORING` in `config.py` must stay `True`;
 `False` sends the shape values unscaled, ignoring `motor_min`.
 
 ## Motor numbering — four schemes, be careful

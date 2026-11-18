@@ -127,10 +127,10 @@ them. Every motor's range is `motor_min.csv` + a uniform `MOTOR_RANGE = 150`, an
 function can push a motor to the top of that range whether or not its mechanism allows it.
 Next step: clamp (not rescale) each motor to its calibrated safe range in `limits.py`.
 
-### 9. `hostCan/motor_max.csv` is unused
+### 9. `motor_max.csv` — removed
 
-Kept in the repo but not read by any code. Either wire it in (could replace item 8) or
-delete it so nobody edits it expecting an effect.
+It was never read. Each motor's top is `motor_min` + `MOTOR_RANGE`, capped at 255
+(`communication.scale_value`).
 
 ## Controller config
 

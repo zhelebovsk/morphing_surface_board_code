@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     if setup.started:
         channel = setup.get_channel()
-        min_limits, _, _ = load_all_limits()
+        min_limits, _ = load_all_limits()
 
         motor = ControlMotor(
             channel=channel,
