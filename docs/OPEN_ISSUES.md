@@ -4,15 +4,23 @@ Ordered roughly by how soon each item will bite. Background is in the dated logs
 
 ## What has and hasn't been verified
 
-**Every run to date has used exactly one board.** Verified on hardware with one board:
-flashing, CAN commands and pong, telemetry streaming, PID with calibrated `min_pwm`,
-the calibration app, presence scanning, PC-side bus-off recovery (`restart-ms 100`), the
-"nothing is answering" early stop, CAN FD (#2), config re-send after a reset (#1), and board
-bus-off recovery (#4).
+**Fleet run (April 2026, branch `the-actual-main`):** an older version ran the full surface
+with ~26–30 boards — classic CAN at 1 Mbit/s through the slcan adapter, at most ~66 Hz send
+rate, `MOTOR_RANGE = 40`, motor minimums calibrated for boards 1–26. This proves the wiring,
+termination as fitted, board IDs, and basic position control at fleet scale.
 
-**Never observed** — designed and reasoned about only: anything with two or more boards on
-the bus, bus load at 30 boards, termination with many boards, presence tracking at scale,
-the full mechanical surface moving together.
+**Verified with one board only** (current code): flashing, CAN commands and pong, telemetry
+streaming, PID with calibrated `min_pwm`, the calibration app, presence scanning, PC-side
+bus-off recovery (`restart-ms 100`), the "nothing is answering" early stop, CAN FD (#2),
+config re-send after a reset (#1), board bus-off recovery (#4), and the full 30-slot send
+load (`test_comms.py`).
+
+**Not yet run with more than one board:** everything added since April — CAN FD, bus-off
+recovery, presence tracking and config re-send, back-to-back 100 Hz sending, the Kvaser
+adapter, and `MOTOR_RANGE = 150` on the full mechanical surface.
+
+**Note:** `MOTOR_RANGE = 150` is ~4× the travel used in April; start the first full run with
+a low μ or **Run statically** and watch for motors reaching their mechanical ends.
 
 The bench board has motors only on hardware channels 12 and 13; calibration results for
 other channels are meaningless.
@@ -76,12 +84,12 @@ move. With no FD board on the bus, the Kvaser retries the first FD frame forever
 `fdcan.c`) answers every FD frame with an error frame, freezing the whole surface. Reflash
 every board before switching the host to FD.
 
-### 3. CAN termination — confirm with the board designer
+### 3. CAN termination — worked in April; measure once
 
 `docs/hardware/scheme-parts.md` says the board has a 120 Ω CAN terminator. A CAN bus needs exactly
-two — one at each physical end. If every board has one fitted, they add up in parallel
-(30 boards ≈ 4 Ω) and the bus stops working somewhere around 4–8 boards. **Ask the
-designer whether the terminator can be disabled per board** before building the full bus.
+two — one at each physical end; 30 fitted in parallel (≈ 4 Ω) would break the bus. The April
+fleet run worked with ~26–30 boards, so the bus as wired is fine; it's still worth knowing
+which boards have one fitted, and whether it can be disabled, before rewiring.
 
 Quick check: with the board unpowered and the adapter cable on but the Kvaser unplugged,
 measure resistance between pins 2 and 7 of the 9-pin connector. ~120 Ω means fitted.

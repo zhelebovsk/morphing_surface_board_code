@@ -9,8 +9,8 @@ travelling wave).
 - A **Linux PC** runs a Python/Qt app that computes the target shape and streams position
   setpoints to every board over **CAN at 1 Mbit/s**, through a Kvaser Leaf v3 USB adapter.
 
-**Status:** tested with one board only (2 motors). Fleet-scale behaviour is untested; see
-[OPEN_ISSUES](docs/OPEN_ISSUES.md).
+**Status:** an older version ran the full surface (~26–30 boards) in April 2026; the current
+code is tested on one board (2 motors). See [OPEN_ISSUES](docs/OPEN_ISSUES.md).
 
 ## Documentation
 
