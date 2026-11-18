@@ -14,7 +14,7 @@ Requirements:
   - Firmware running on the board
 
 Usage:
-  cd host_CAN/HW_tests && python3 adc_rate_test.py
+  cd hostCan/HW_tests && python3 adc_rate_test.py
 """
 
 import json

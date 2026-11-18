@@ -2,7 +2,7 @@
 
 ```
  ┌──────────────────────── Linux PC ────────────────────────┐
- │ host_CAN/main.py  (PySide6 GUI)                           │
+ │ hostCan/main.py  (PySide6 GUI)                           │
  │   engine.py      100 Hz send loop + presence monitor     │
  │   wingcontrol.py samples u(x,y,t) at each motor position │
  │   communication.py  python-can / socketcan               │
@@ -105,7 +105,7 @@ and config variables; it never touches the motors directly.
    (`hardware/scheme-parts.md`, "motor limitation").
 4. Host-side per-motor range: `motor_min.csv` + `MOTOR_RANGE` (below).
 
-## Host software (`host_CAN/`)
+## Host software (`hostCan/`)
 
 Python 3, PySide6, python-can (socketcan backend), numpy. Linux only (uses socketcan and
 `/sys/class/net`).
@@ -185,7 +185,7 @@ two-input drive the motor driver (DRV8833-type) expects, and contains a pot comb
 programmed separately with Lattice Diamond over JTAG (connector X7). Which variant is on the
 boards isn't recorded (OPEN_ISSUES, Housekeeping).
 
-## Hardware test tools (`host_CAN/HW_tests/`)
+## Hardware test tools (`hostCan/HW_tests/`)
 
 | Tool | Needs | Purpose |
 |---|---|---|

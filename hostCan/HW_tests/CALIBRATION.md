@@ -8,7 +8,7 @@ Finds `min_pwm` (stiction threshold) and step-response characteristics per motor
 
 ## Run
 ```bash
-cd host_CAN/HW_tests
+cd hostCan/HW_tests
 python calibration_app.py
 ```
 

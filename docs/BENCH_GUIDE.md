@@ -69,7 +69,7 @@ cansend can0 101#06             # ping board 1 by hand → candump shows a reply
 ## Run the control GUI
 
 ```bash
-cd host_CAN
+cd hostCan
 python main.py
 ```
 
@@ -85,12 +85,12 @@ python main.py
    resets (terminal: *"Re-sending controller config to board(s) …"*).
 4. **Run statically** (one frame at time *t*) or **Start dynamic** (continuous at
    `UPDATE_HZ`, speed set by μ in wave cycles per second, default 0.1, max 0.5).
-5. To change what the surface does, edit `motor_function()` in `host_CAN/function.py`.
+5. To change what the surface does, edit `motor_function()` in `hostCan/function.py`.
 
 Calibration controls in the main window:
-- **Edit limits** — table editor for `host_CAN/motor_min.csv` (each motor's lowest allowed
+- **Edit limits** — table editor for `hostCan/motor_min.csv` (each motor's lowest allowed
   position byte; the usable range is `min .. min + MOTOR_RANGE`).
-- **Reload limits** — re-read `motor_min.csv` and `host_CAN/HW_tests/calibrations/latest.json`.
+- **Reload limits** — re-read `motor_min.csv` and `hostCan/HW_tests/calibrations/latest.json`.
   The GUI also auto-reloads when either file changes.
 
 The first position command after startup moves every motor to the commanded shape at
@@ -98,7 +98,7 @@ once, from wherever it was holding; make sure nothing is near a mechanical stop.
 
 ## Settings
 
-**Host — `host_CAN/config.py`** (restart the GUI after changing):
+**Host — `hostCan/config.py`** (restart the GUI after changing):
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -118,14 +118,14 @@ PWM limit, deadband, `min_pwm` (per board, from calibration). The firmware defau
 
 ## Calibrate motors
 
-See `host_CAN/HW_tests/CALIBRATION.md`. Short version: close the GUI, then
+See `hostCan/HW_tests/CALIBRATION.md`. Short version: close the GUI, then
 
 ```bash
-cd host_CAN/HW_tests && python calibration_app.py
+cd hostCan/HW_tests && python calibration_app.py
 ```
 
 It finds each motor's `min_pwm`, flags suspicious channels (wrong direction, not attached),
-writes `host_CAN/HW_tests/calibrations/latest.json` and sends the result to the boards. Commit
+writes `hostCan/HW_tests/calibrations/latest.json` and sends the result to the boards. Commit
 `latest.json` when you're happy with a run (timestamped runs are git-ignored).
 
 ## Editing the CubeMX project
@@ -189,7 +189,7 @@ journalctl -k | grep can0
 | Motor never moves, its pot reads ~4095 | Pot not connected; firmware hard stop keeps it off. |
 | Motor runs away from its target | Pot/motor polarity reversed on that channel. Calibration app flags this as "suspicious". |
 | Board hangs at boot | Historically the ADC DMA wait (fixed 2026-08-11, now bounded). Attach with OpenOCD + `gdb-multiarch` to see where it's stuck. |
-| GUI won't start / import error | Check `git diff host_CAN/` for stray edits — this has happened. |
+| GUI won't start / import error | Check `git diff hostCan/` for stray edits — this has happened. |
 
 ### Live debugging
 

@@ -32,7 +32,7 @@ with 30 boards); until then the board runs on the firmware defaults (#10).
 
 ### 2. Bus load at 30 boards — CAN FD halves it
 
-Measured with `host_CAN/test_comms.py` (one real board ACKs the frames for the 29 absent ones),
+Measured with `hostCan/test_comms.py` (one real board ACKs the frames for the 29 absent ones),
 time per 30-board cycle at `UPDATE_HZ = 100`:
 
 | Mode | Frames per cycle | Time per 10 ms cycle | Bus load |
@@ -43,8 +43,8 @@ time per 30-board cycle at `UPDATE_HZ = 100`:
 CAN is normally kept under 30–40%, so classic leaves too little room for presence pings and
 telemetry. FD is the planned fix; the steps below were run on one board.
 
-- **If FD causes trouble:** `UPDATE_HZ = 50` in `host_CAN/config.py` halves either figure. Motor
-  mechanical bandwidth is under 20 Hz (`host_CAN/HW_tests/NOTES_2026-06-15.md`).
+- **If FD causes trouble:** `UPDATE_HZ = 50` in `hostCan/config.py` halves either figure. Motor
+  mechanical bandwidth is under 20 Hz (`hostCan/HW_tests/NOTES_2026-06-15.md`).
 - The slcan adapter can't do FD.
 - Sending only changed values is another option.
 
@@ -54,7 +54,7 @@ telemetry. FD is the planned fix; the steps below were run on one board.
    firmware works unchanged on a classic bus.
 2. `./can_start_kvaser.sh fd`, then restart the GUI (the host follows `can0`'s mode and prints
    a line when it is in FD mode).
-3. Run `host_CAN/test_comms.py`: *frames on the bus* must match the expected count and
+3. Run `hostCan/test_comms.py`: *frames on the bus* must match the expected count and
    `bus-errors` in `ip -details -statistics link show can0` must stay at 0.
 
 Bench-tested on one board, including motors following **Start dynamic**. Still unchecked:
@@ -107,7 +107,7 @@ while the PID loop is stopped.
 `fetch_potentiometer_values()` starts the ADC DMA and busy-waits for it every iteration.
 The real fix is timer-triggered, circular, non-blocking DMA, so the loop always uses the
 latest samples without waiting. Today the wait is only bounded by a 2 ms timeout.
-Measure with `host_CAN/HW_tests/adc_rate_test.py`.
+Measure with `hostCan/HW_tests/adc_rate_test.py`.
 
 ### 7. Re-tune alpha if the loop rate changes
 
@@ -124,7 +124,7 @@ them. Every motor's range is `motor_min.csv` + a uniform `MOTOR_RANGE = 150`, an
 function can push a motor to the top of that range whether or not its mechanism allows it.
 Next step: clamp (not rescale) each motor to its calibrated safe range in `limits.py`.
 
-### 9. `host_CAN/motor_max.csv` is unused
+### 9. `hostCan/motor_max.csv` is unused
 
 Kept in the repo but not read by any code. Either wire it in (could replace item 8) or
 delete it so nobody edits it expecting an effect.

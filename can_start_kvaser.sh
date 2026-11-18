@@ -17,7 +17,7 @@ sudo ip link set can0 txqueuelen 1000
 # CAN acknowledgement is NOT addressed: every healthy node drives the ACK slot
 # dominant for every frame it receives correctly, whatever ID is in the header.
 # So pinging a board that isn't wired up is harmless as long as at least one
-# other board is alive to answer -- host_CAN/test_comms.py relies on exactly
+# other board is alive to answer -- hostCan/test_comms.py relies on exactly
 # this (one real board ACKs the frames addressed to the other 29).
 #
 # If NO node can ACK (nothing powered, bus unplugged), the controller retries

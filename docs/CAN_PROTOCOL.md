@@ -2,7 +2,7 @@
 
 Classic CAN, **1 Mbit/s**, standard 11-bit IDs, 8-byte max payload. Optional CAN FD with a
 2 Mbit/s data phase for position frames (`0x07`, OPEN_ISSUES #2).
-Source of truth: `firmware/App/Src/can_helper.c` (board side), `host_CAN/communication.py` (host side).
+Source of truth: `firmware/App/Src/can_helper.c` (board side), `hostCan/communication.py` (host side).
 
 ## Addressing
 
@@ -13,7 +13,7 @@ Each board's ID comes from its 6-position DIP switch, read once at boot
 CAN ID = 0x100 + DIP value        board 1 → 0x101, board 30 → 0x11E
 ```
 
-- The host numbers boards **1..30** (`BOARD_COUNT` in `host_CAN/config.py`), so set DIPs to
+- The host numbers boards **1..30** (`BOARD_COUNT` in `hostCan/config.py`), so set DIPs to
   1..30. DIP 0 (ID `0x100`) is never addressed by the host. 6 bits allow up to 63.
 - **The same ID is used in both directions.** The host sends commands to `0x100+n`; board
   *n* replies on `0x100+n` too. Replies are told apart from commands by their first byte
@@ -91,7 +91,7 @@ to the PC (as `0xA0` frames, below) until told to stop. Normally traffic only fl
 board, and boards never report positions. The motor keeps being controlled normally while
 streaming.
 
-Used by `host_CAN/HW_tests/calibration_app.py` and `step_response_test.py` to watch how a motor
+Used by `hostCan/HW_tests/calibration_app.py` and `step_response_test.py` to watch how a motor
 responds to a small step (did it move, which way, how fast). The main GUI never uses it.
 
 **Note:** use this, not OpenOCD, to measure motion: OpenOCD reads halt the CPU and distort
