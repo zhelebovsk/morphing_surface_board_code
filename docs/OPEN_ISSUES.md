@@ -109,14 +109,6 @@ while the PID loop is stopped.
 
 `can_start_kvaser.sh` sets the Kvaser to the boards' 87.5% in both modes (required for FD, #2).
 
-### 12. Unexplained CAN receive errors on the bench
-
-On 2026-11-18 the Kvaser counted 252 receive errors (0 transmit errors) at some point during an
-afternoon of testing. They did not recur idle, under 1000 pings, under a 1 kHz telemetry stream,
-or during a full-speed stroke; likely an event such as a board reset or plug-in mid-traffic.
-To catch the cause next time, watch `ip -details -statistics link show can0` before and after
-each step of a session.
-
 ## Firmware performance
 
 ### 6. Control loop runs at ~7.5 kHz, not the 10 kHz target
