@@ -42,6 +42,7 @@ import can
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from config import CALIBRATION_FILE  # noqa: E402
+from common import reply_ids  # noqa: E402
 
 POT_ZERO, STEP, BYTE_MAX = 1048, 7, 255          # firmware: desired = 1048 + 7·byte
 REACHABLE = (POT_ZERO, POT_ZERO + STEP * BYTE_MAX)
@@ -85,7 +86,7 @@ class Board:
             if msg is None:
                 return None
             d = msg.data
-            if msg.arbitration_id != self.id or len(d) < 8 or d[0] != 0xA0 or d[1] != fw_index:
+            if msg.arbitration_id not in reply_ids(self.id) or len(d) < 8 or d[0] != 0xA0 or d[1] != fw_index:
                 continue
             filt = d[4] | (d[5] << 8)
             filt = filt - 65536 if filt >= 32768 else filt

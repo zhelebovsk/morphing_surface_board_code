@@ -30,6 +30,8 @@ from PySide6.QtWidgets import (
     QTextEdit, QVBoxLayout, QWidget,
 )
 
+from common import reply_filters, reply_ids
+
 # ── Hardware constants ────────────────────────────────────────────────────────
 
 LOCATION_MUL  = 7
@@ -82,7 +84,7 @@ def _parse_stream(msg, motor_id):
 
 
 def _record_step(bus, can_id, motor_id, duration_s):
-    bus.set_filters([{"can_id": can_id, "can_mask": 0x7FF, "extended": False}])
+    bus.set_filters(reply_filters(can_id))
     raws, times = [], []
     t0 = time.perf_counter()
     while time.perf_counter() - t0 < duration_s:
@@ -140,7 +142,7 @@ def _read_motor_positions(bus, can_id):
     """Stream each motor briefly to read its current raw pot value."""
     # Filter to this board's CAN ID only — critical when boards run in parallel,
     # otherwise every socket drowns in frames from all other boards.
-    bus.set_filters([{"can_id": can_id, "can_mask": 0x7FF, "extended": False}])
+    bus.set_filters(reply_filters(can_id))
     pots = {}
     for motor_id in ACTIVE_MOTORS:
         bus.send(can.Message(
@@ -151,7 +153,7 @@ def _read_motor_positions(bus, can_id):
         t0 = time.perf_counter()
         while time.perf_counter() - t0 < 0.3:
             msg = bus.recv(timeout=0.05)
-            if msg is None or msg.arbitration_id != can_id:
+            if msg is None or msg.arbitration_id not in reply_ids(can_id):
                 continue
             parsed = _parse_stream(msg, motor_id)
             if parsed:

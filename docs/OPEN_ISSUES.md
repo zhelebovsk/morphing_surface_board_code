@@ -109,6 +109,14 @@ while the PID loop is stopped.
 
 `can_start_kvaser.sh` sets the Kvaser to the boards' 87.5% in both modes (required for FD, #2).
 
+### 12. Boards replied on their command ID — fixed in firmware, reflash every board
+
+Board *n* used to reply on `0x100+n`, the ID the host commands it on. When both sent at the
+same moment the frames collided: ~16 errors per collision until one side went error-passive
+(reproduced on the bench, 32 errors in 20 s at 100 Hz; 0 with different IDs). Replies now use
+`0x180+n` (`docs/CAN_PROTOCOL.md`). Boards on older firmware keep colliding until reflashed;
+the host understands both.
+
 ## Firmware performance
 
 ### 6. Control loop runs at ~7.5 kHz, not the 10 kHz target

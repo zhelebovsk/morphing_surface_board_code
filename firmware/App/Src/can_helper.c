@@ -71,7 +71,7 @@ void CAN_Stream_Update(void) {
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len)
 {
     FDCAN_TxHeaderTypeDef tx_header;
-    tx_header.Identifier = board_id;
+    tx_header.Identifier = board_id + REPLY_ID_OFFSET;   // replies never reuse the command ID
     tx_header.IdType = FDCAN_STANDARD_ID;
     tx_header.TxFrameType = FDCAN_DATA_FRAME;
     tx_header.DataLength = dlc_len; // e.g., FDCAN_DLC_BYTES_8

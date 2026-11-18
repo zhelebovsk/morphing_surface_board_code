@@ -9,6 +9,21 @@ import subprocess
 import socket
 import time
 
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from config import REPLY_ID_OFFSET  # noqa: E402
+
+
+def reply_ids(can_id):
+    """CAN IDs a board's replies can arrive on: current firmware, then pre-2026-11-18 firmware."""
+    return (can_id + REPLY_ID_OFFSET, can_id)
+
+
+def reply_filters(can_id):
+    """socketcan filters that pass a board's replies (both firmware generations)."""
+    return [{"can_id": i, "can_mask": 0x7FF, "extended": False} for i in reply_ids(can_id)]
+
+
 ELF_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "firmware", "build", "STM32_code.elf")
 OPENOCD_CFG = ["interface/stlink.cfg", "target/stm32g4x.cfg"]
 OPENOCD_HOST = "localhost"

@@ -12,6 +12,10 @@
 // `./can_start_kvaser.sh fd` (docs/OPEN_ISSUES.md #2). 0 = classic only.
 #define CAN_FD_ENABLED 1
 
+// Board n takes commands on 0x100+n and replies on 0x100+n+REPLY_ID_OFFSET (0x181 for
+// board 1), so no CAN ID has two senders. Must match REPLY_ID_OFFSET in hostCan/config.py.
+#define REPLY_ID_OFFSET 0x80
+
 void CAN_Configure_FD(void);
 HAL_StatusTypeDef CAN_Send(uint32_t board_id, void *data, uint32_t dlc_len);
 HAL_StatusTypeDef CAN_Send_ID(uint32_t board_id);

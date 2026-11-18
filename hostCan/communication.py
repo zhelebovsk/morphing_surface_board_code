@@ -3,7 +3,7 @@ import time
 import threading
 import re
 import subprocess
-from config import REFACTORING, MOTOR_RANGE
+from config import REFACTORING, MOTOR_RANGE, REPLY_ID_OFFSET
 from utils import clamp8
 import os
 
@@ -221,6 +221,8 @@ class MotorCommunication:
                     break
                 if len(msg.data) >= 2 and msg.data[0] == 0xA1:
                     responder = msg.arbitration_id - 0x100
+                    if responder >= REPLY_ID_OFFSET:       # new firmware: 0x180+n
+                        responder -= REPLY_ID_OFFSET
                     if len(msg.data) >= 3:
                         if msg.data[2]:
                             self.needs_config.discard(responder)

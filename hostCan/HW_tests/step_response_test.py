@@ -36,7 +36,7 @@ from datetime import datetime
 
 import can
 
-from common import ELF_PATH, OpenOCDProcess, OpenOCDTelnet, get_symbol_address
+from common import ELF_PATH, OpenOCDProcess, OpenOCDTelnet, get_symbol_address, reply_filters
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ def main():
     filt_samples = []
     timestamps   = []
 
-    bus.set_filters([{"can_id": can_id, "can_mask": 0x7FF, "extended": False}])
+    bus.set_filters(reply_filters(can_id))
 
     while time.perf_counter() - t_step < POLL_DURATION_S:
         msg = bus.recv(timeout=0.1)

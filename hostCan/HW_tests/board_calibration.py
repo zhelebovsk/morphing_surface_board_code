@@ -27,7 +27,7 @@ from datetime import datetime
 
 import can
 
-from common import ELF_PATH, OpenOCDProcess, OpenOCDTelnet, get_symbol_address
+from common import ELF_PATH, OpenOCDProcess, OpenOCDTelnet, get_symbol_address, reply_filters
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ def parse_stream(msg, motor_id):
 
 def record_step(bus, can_id, motor_id, duration_s):
     """Collect CAN stream frames for duration_s. Returns (raw_list, time_list)."""
-    bus.set_filters([{"can_id": can_id, "can_mask": 0x7FF, "extended": False}])
+    bus.set_filters(reply_filters(can_id))
     raws, times = [], []
     t0 = time.perf_counter()
     while time.perf_counter() - t0 < duration_s:

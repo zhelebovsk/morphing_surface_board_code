@@ -4,6 +4,10 @@ MOTOR_SPACING_MM = 10.0   # mm per motor index (Y axis)
 BOARD_SPACING_MM = 10.0   # mm per board index (X axis)
 
 BOARD_COUNT = 30
+
+# Board n takes commands on 0x100+n and replies on 0x100+n+REPLY_ID_OFFSET. Firmware from
+# before 2026-11-18 replied on 0x100+n; the host accepts both. Must match can_helper.h.
+REPLY_ID_OFFSET = 0x80
 MOTORS_PER_BOARD = 14
 
 from pathlib import Path

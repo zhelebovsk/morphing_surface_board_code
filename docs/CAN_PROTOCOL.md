@@ -10,14 +10,17 @@ Each board's ID comes from its 6-position DIP switch, read once at boot
 (`firmware/App/Src/dip.c`):
 
 ```
-CAN ID = 0x100 + DIP value        board 1 → 0x101, board 30 → 0x11E
+commands to board n:   0x100 + n        board 1 → 0x101, board 30 → 0x11E
+replies from board n:  0x180 + n        board 1 → 0x181, board 30 → 0x19E
 ```
 
 - The host numbers boards **1..30** (`BOARD_COUNT` in `hostCan/config.py`), so set DIPs to
   1..30. DIP 0 (ID `0x100`) is never addressed by the host. 6 bits allow up to 63.
-- **The same ID is used in both directions.** The host sends commands to `0x100+n`; board
-  *n* replies on `0x100+n` too. Replies are told apart from commands by their first byte
-  (`0xA0`/`0xA1`), never by ID.
+- **Every ID has one sender.** Two nodes sending the same ID at the same moment corrupt each
+  other's frame, so replies use their own range (`REPLY_ID_OFFSET = 0x80`, in
+  `firmware/App/Inc/can_helper.h` and `hostCan/config.py`). Commands win arbitration over replies.
+- Firmware from before 2026-11-18 replies on `0x100+n`; the host accepts both until every
+  board is reflashed.
 - There is **no hardware acceptance filter**: every board receives every frame, and the RX
   interrupt discards the ones with another board's ID.
 
@@ -131,7 +134,7 @@ All little-endian.
 ```
 
 - Byte 1 is the low byte of the CAN ID (e.g. `0x01` for board 1); the host identifies the
-  responder from the arbitration ID (`id - 0x100`).
+  responder from the arbitration ID (`0x180+n`, or `0x100+n` from older firmware).
 - Byte 2 is `1` once the board has received a `0x03` config since it booted, `0` before. The
   host re-sends config to any board reporting `0` (see `ControlMotor._resend_config_where_needed`).
   Older firmware sends a 2-byte pong; the host then re-sends config whenever a board

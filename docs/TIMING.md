@@ -48,18 +48,23 @@ The smallest update is one board frame: 7 motors in classic CAN, all 14 in FD.
 
 ## Wave tracking (measured)
 
-Sine, ±300 counts around 1601, u_limit 65, 100 Hz setpoints, two runs.
+Sine, ±300 counts around 1601, u_limit 65, 100 Hz setpoints (μ ≤ 0.5: two runs; above: one run).
 
 | μ (cycles/s) | Amplitude reached | Lag | Max error |
 |---|---|---|---|
 | 0.1 | 99.5–99.6 % | 54 ms | 25–29 counts |
 | 0.2 | 99.5 % | 35 ms | 26–31 counts |
 | 0.3 | 99.5 % | 27 ms | 26–33 counts |
-| 0.5 (GUI max) | 99.4–99.5 % | 22 ms | 32 counts |
+| 0.5 (GUI max) | 99.4–99.5 % | 22 ms | 32–37 counts |
+| 0.8 | 99.6 % | 19 ms | 42 counts |
+| 1.0 | 98.5 % | 24 ms | 67 counts |
+| 1.2 | 92.8 % | 36 ms | 107 counts |
+| 1.5 | 77.4 % | 65 ms | 193 counts |
 
-The lag comes mostly from the deadband: the motor reacts once it is 10 counts behind, which takes
-longer on a slow wave. The motor needs at most ~940 counts/s here, well under its cruise speed, so the
-real limit lies above μ = 0.5 (not measured).
+Up to μ ≈ 1.0 the full height is reached; above that the wave flattens because it needs more
+speed than the motor's cruise speed at u_limit 65 (μ = 1.5 needs ~2830 counts/s). A higher
+u_limit or a smaller amplitude moves this limit up. At low μ the lag comes mostly from the
+deadband: the motor reacts once it is 10 counts behind, which takes longer on a slow wave.
 
 ## Measuring it again
 
@@ -71,4 +76,4 @@ cd .. && python3 test_comms.py         # full 30-slot bus cycle
 ```
 
 **Not measured yet:** mm per ADC count, other motors, motors under the real surface load, wave
-speeds above μ = 0.5, the host's send-loop jitter, and anything with more than one board.
+speeds at higher u_limit, the host's send-loop jitter, and anything with more than one board.
