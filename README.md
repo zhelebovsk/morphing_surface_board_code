@@ -9,7 +9,7 @@ travelling wave).
 - A **Linux PC** runs a Python/Qt app that computes the target shape and streams position
   setpoints to every board over **CAN at 1 Mbit/s**, through a Kvaser Leaf v3 USB adapter.
 
-**Status:** an older version ran the full surface (~26–30 boards) in April 2026; the current
+**Status:** an older version ran the full surface (~26–30 boards) in June 2026; the current
 code is tested on one board (2 motors). See [OPEN_ISSUES](docs/OPEN_ISSUES.md).
 
 ## Documentation
@@ -20,6 +20,7 @@ code is tested on one board (2 motors). See [OPEN_ISSUES](docs/OPEN_ISSUES.md).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the firmware and host software work, units, motor numbering |
 | [docs/CAN_PROTOCOL.md](docs/CAN_PROTOCOL.md) | Every CAN frame the system uses, byte by byte |
 | [docs/OPEN_ISSUES.md](docs/OPEN_ISSUES.md) | Known problems, untested assumptions, backlog |
+| [docs/TIMING.md](docs/TIMING.md) | Measured timing: CAN latency and cycle times, loop rate, motor speed, wave tracking |
 | [hostCan/HW_tests/CALIBRATION.md](hostCan/HW_tests/CALIBRATION.md) | The per-motor calibration app |
 | `docs/changes/` | Dated session logs: what changed and *why*. Detailed history; the docs above are the summary |
 | `docs/hardware/` | Original hardware notes (board schematic parts, pinouts, solved problems) |

@@ -191,6 +191,7 @@ boards isn't recorded (OPEN_ISSUES, Housekeeping).
 |---|---|---|
 | `calibration_app.py` | CAN | Per-motor `min_pwm` search + range sweep, all boards in parallel; writes `calibrations/latest.json` (read by `limits.py`). See `CALIBRATION.md` |
 | `step_response_test.py` | CAN | Step one motor, record via telemetry stream, fit τ |
+| `motion_timing_test.py` | CAN | Real motion timing of one motor: start delay, spin-up, top speed, edge-to-edge travel, overshoot, sine tracking vs μ |
 | `board_calibration.py` | CAN | Older single-board CLI calibration |
 | `adc_rate_test.py` | ST-LINK + OpenOCD | Measure the real control-loop rate |
 | `noise_test.py`, `kalman_params.py` | ST-LINK + OpenOCD | Pot noise and Kalman/alpha analysis |

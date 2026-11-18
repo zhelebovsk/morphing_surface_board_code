@@ -4,10 +4,11 @@ Ordered roughly by how soon each item will bite. Background is in the dated logs
 
 ## What has and hasn't been verified
 
-**Fleet run (April 2026, branch `the-actual-main`):** an older version ran the full surface
-with ~26–30 boards — classic CAN at 1 Mbit/s through the slcan adapter, at most ~66 Hz send
-rate, `MOTOR_RANGE = 40`, motor minimums calibrated for boards 1–26. This proves the wiring,
-termination as fitted, board IDs, and basic position control at fleet scale.
+**Fleet run (June 2026, `main` as of ~`3fc2979`):** an older version ran the full surface
+with ~26–30 boards — classic CAN at 1 Mbit/s through the slcan adapter, 100 Hz back-to-back
+sending, `MOTOR_RANGE = 40`, `min_pwm` and telemetry streaming already in the firmware. This
+proves the wiring, termination as fitted, board IDs, classic-CAN bus load and basic position
+control at fleet scale.
 
 **Verified with one board only** (current code): flashing, CAN commands and pong, telemetry
 streaming, PID with calibrated `min_pwm`, the calibration app, presence scanning, PC-side
@@ -15,11 +16,11 @@ bus-off recovery (`restart-ms 100`), the "nothing is answering" early stop, CAN 
 config re-send after a reset (#1), board bus-off recovery (#4), and the full 30-slot send
 load (`test_comms.py`).
 
-**Not yet run with more than one board:** everything added since April — CAN FD, bus-off
-recovery, presence tracking and config re-send, back-to-back 100 Hz sending, the Kvaser
+**Not yet run with more than one board:** everything added since June — CAN FD, bus-off
+recovery, presence tracking and config re-send, per-board calibrated `min_pwm`, the Kvaser
 adapter, and `MOTOR_RANGE = 150` on the full mechanical surface.
 
-**Note:** `MOTOR_RANGE = 150` is ~4× the travel used in April; start the first full run with
+**Note:** `MOTOR_RANGE = 150` is ~4× the travel used in June; start the first full run with
 a low μ or **Run statically** and watch for motors reaching their mechanical ends.
 
 The bench board has motors only on hardware channels 12 and 13; calibration results for
@@ -84,10 +85,10 @@ move. With no FD board on the bus, the Kvaser retries the first FD frame forever
 `fdcan.c`) answers every FD frame with an error frame, freezing the whole surface. Reflash
 every board before switching the host to FD.
 
-### 3. CAN termination — worked in April; measure once
+### 3. CAN termination — worked in June; measure once
 
 `docs/hardware/scheme-parts.md` says the board has a 120 Ω CAN terminator. A CAN bus needs exactly
-two — one at each physical end; 30 fitted in parallel (≈ 4 Ω) would break the bus. The April
+two — one at each physical end; 30 fitted in parallel (≈ 4 Ω) would break the bus. The June
 fleet run worked with ~26–30 boards, so the bus as wired is fine; it's still worth knowing
 which boards have one fitted, and whether it can be disabled, before rewiring.
 
@@ -107,6 +108,14 @@ while the PID loop is stopped.
 ### 5. Bit-timing sample point — done
 
 `can_start_kvaser.sh` sets the Kvaser to the boards' 87.5% in both modes (required for FD, #2).
+
+### 12. Unexplained CAN receive errors on the bench
+
+On 2026-11-18 the Kvaser counted 252 receive errors (0 transmit errors) at some point during an
+afternoon of testing. They did not recur idle, under 1000 pings, under a 1 kHz telemetry stream,
+or during a full-speed stroke; likely an event such as a board reset or plug-in mid-traffic.
+To catch the cause next time, watch `ip -details -statistics link show can0` before and after
+each step of a session.
 
 ## Firmware performance
 
